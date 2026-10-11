@@ -13,5 +13,5 @@ export default defineConfig({
     server: { entry: "server" },
   },
   // When building on Vercel, target Vercel's runtime instead of the default.
-  ...(process.env.VERCEL ? { nitro: { preset: "vercel" } } : {}),
+  ...(process.env["VERCEL"] ? { nitro: { preset: "vercel" } } : {}),
 });

@@ -91,7 +91,7 @@ export const sar = (n: number) => `${Number(n).toLocaleString("en-US", { maximum
 
 export function timeSlots(open: string, close: string, step: number): string[] {
   const toMin = (t: string) => {
-    const [h, m] = t.split(":").map(Number);
+    const [h = 0, m = 0] = t.split(":").map(Number);
     return h * 60 + (m || 0);
   };
   const out: string[] = [];
@@ -102,7 +102,7 @@ export function timeSlots(open: string, close: string, step: number): string[] {
 }
 
 export const fmtTime = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
+  const [h = 0, m = 0] = t.split(":").map(Number);
   const ap = h >= 12 ? "PM" : "AM";
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${ap}`;
 };
