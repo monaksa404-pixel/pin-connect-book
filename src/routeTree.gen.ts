@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BookRouteImport } from './routes/book'
 import { Route as CartRouteImport } from './routes/cart'
+import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as LocationRouteImport } from './routes/location'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MyBookingsRouteImport } from './routes/my-bookings'
@@ -30,9 +32,19 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BookRoute = BookRouteImport.update({
+  id: '/book',
+  path: '/book',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CartRoute = CartRouteImport.update({
   id: '/cart',
   path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LocationRoute = LocationRouteImport.update({
@@ -74,7 +86,9 @@ const SupportRoute = SupportRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/book': typeof BookRoute
   '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
   '/location': typeof LocationRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
@@ -86,7 +100,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/book': typeof BookRoute
   '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
   '/location': typeof LocationRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
@@ -99,7 +115,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/book': typeof BookRoute
   '/cart': typeof CartRoute
+  '/checkout': typeof CheckoutRoute
   '/location': typeof LocationRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
@@ -113,7 +131,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/book'
     | '/cart'
+    | '/checkout'
     | '/location'
     | '/login'
     | '/my-bookings'
@@ -125,7 +145,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/book'
     | '/cart'
+    | '/checkout'
     | '/location'
     | '/login'
     | '/my-bookings'
@@ -137,7 +159,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/book'
     | '/cart'
+    | '/checkout'
     | '/location'
     | '/login'
     | '/my-bookings'
@@ -150,7 +174,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  BookRoute: typeof BookRoute
   CartRoute: typeof CartRoute
+  CheckoutRoute: typeof CheckoutRoute
   LocationRoute: typeof LocationRoute
   LoginRoute: typeof LoginRoute
   MyBookingsRoute: typeof MyBookingsRoute
@@ -176,11 +202,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/book': {
+      id: '/book'
+      path: '/book'
+      fullPath: '/book'
+      preLoaderRoute: typeof BookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cart': {
       id: '/cart'
       path: '/cart'
       fullPath: '/cart'
       preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/location': {
@@ -238,7 +278,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  BookRoute: BookRoute,
   CartRoute: CartRoute,
+  CheckoutRoute: CheckoutRoute,
   LocationRoute: LocationRoute,
   LoginRoute: LoginRoute,
   MyBookingsRoute: MyBookingsRoute,
