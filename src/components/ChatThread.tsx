@@ -1,0 +1,60 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { Send } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { sendAlert } from "@/lib/alerts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: string };
+
+/** Support conversation for a customer. `as` decides which side is "me". */
+export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin" }) {
+  const qc = useQueryClient();
+  const [text, setText] = useState("");
+  const end = useRef<HTMLDivElement>(null);
+  const { data = [] } = useQuery({
+    queryKey: ["chat", userId],
+    refetchInterval: 4000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("support_messages").select("id, sender, body, created_at").eq("user_id", userId).order("created_at");
+      if (error) throw error;
+      return data as Msg[];
+    },
+  });
+  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [data.length]);
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const body = text.trim().slice(0, 2000);
+    if (!body) return;
+    setText("");
+    const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body });
+    if (error) return toast.error(error.message);
+    if (as === "user") sendAlert("support", `💬 New support message:\n${body}`);
+    qc.invalidateQueries({ queryKey: ["chat", userId] });
+  };
+
+  return (
+    <div className="flex h-[60vh] flex-col rounded-3xl border border-border bg-card">
+      <div className="flex-1 space-y-2 overflow-y-auto p-4">
+        {data.length === 0 && <p className="py-10 text-center text-sm text-muted-foreground">No messages yet. Say hello!</p>}
+        {data.map((m) => (
+          <div key={m.id} className={cn("flex", m.sender === as ? "justify-end" : "justify-start")}>
+            <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === as ? "bg-primary text-primary-foreground" : "bg-muted")}>
+              <p className="whitespace-pre-wrap break-words">{m.body}</p>
+              <p className="mt-1 text-[10px] opacity-70">{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+            </div>
+          </div>
+        ))}
+        <div ref={end} />
+      </div>
+      <form onSubmit={send} className="flex gap-2 border-t border-border p-3">
+        <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" className="rounded-full" />
+        <Button size="icon" className="shrink-0 rounded-full" aria-label="Send"><Send className="h-4 w-4" /></Button>
+      </form>
+    </div>
+  );
+}
