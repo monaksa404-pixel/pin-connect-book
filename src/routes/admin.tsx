@@ -90,7 +90,7 @@ function BookingsTab() {
 
   const toggleFull = async () => {
     const { error } = await supabase.from("settings").update({ bookings_full: !settings.bookings_full }).eq("id", 1);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(settings.bookings_full ? "Bookings re-opened" : "Bookings closed — customers now see the 'too many customers' message");
     qc.invalidateQueries({ queryKey: ["settings"] });
   };
@@ -161,14 +161,14 @@ function BookingDetail({ b }: { b: Booking }) {
   const [extra, setExtra] = useState(String(b.extra_amount || b.remaining_amount));
   const update = async (patch: Partial<Booking>, msg: string) => {
     const { error } = await supabase.from("bookings").update(patch).eq("id", b.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(msg);
     qc.invalidateQueries({ queryKey: ["admin-bookings"] });
   };
   const del = async () => {
     if (!confirm("Delete this booking permanently?")) return;
     const { error } = await supabase.from("bookings").delete().eq("id", b.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["admin-bookings"] });
   };
 
@@ -244,24 +244,24 @@ function ServicesTab() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ["admin-services"] }); qc.invalidateQueries({ queryKey: ["services"] }); };
 
   const save = async () => {
-    if (!edit || !edit.name.trim()) return toast.error("Name is required");
+    if (!edit || !edit.name.trim()) { toast.error("Name is required"); return; }
     let image_url = edit.image_url;
     if (file) {
       const path = `services/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, "")}`;
       const { error } = await supabase.storage.from("media").upload(path, file);
-      if (error) return toast.error(error.message);
+      if (error) { toast.error(error.message); return; }
       image_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
     }
     const { id, ...row } = { ...edit, image_url, price: Number(edit.price), duration_min: Number(edit.duration_min), sort: Number(edit.sort) };
     const { error } = id ? await supabase.from("services").update(row).eq("id", id) : await supabase.from("services").insert(row);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Saved");
     setEdit(null); setFile(null); refresh();
   };
   const del = async (id: string) => {
     if (!confirm("Delete this service?")) return;
     const { error } = await supabase.from("services").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     refresh();
   };
 
@@ -322,7 +322,7 @@ function SettingsTab() {
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...cur, [k]: v });
   const save = async () => {
     const { error } = await supabase.from("settings").update({ ...cur, advance_percent: Number(cur.advance_percent), slot_minutes: Number(cur.slot_minutes), updated_at: new Date().toISOString() }).eq("id", 1);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Settings saved");
     setS(null);
     qc.invalidateQueries({ queryKey: ["settings"] });
