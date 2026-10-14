@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/services")({
-  validateSearch: (s: Record<string, unknown>): { category?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { category?: string | undefined } => ({
     category: typeof s["category"] === "string" ? (s["category"] as string) : undefined,
   }),
   head: () => ({

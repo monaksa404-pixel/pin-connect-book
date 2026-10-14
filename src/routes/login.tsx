@@ -29,15 +29,15 @@ function LoginPage() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
-    if (error) return toast.error(friendlyError(error));
+    if (error) { toast.error(friendlyError(error)); return; }
     toast.success("Welcome back!");
     navigate({ to: "/" });
   };
 
   const reset = async () => {
-    if (!email) return toast.error("Enter your email first.");
+    if (!email) { toast.error("Enter your email first."); return; }
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + "/login" });
-    if (error) return toast.error(friendlyError(error));
+    if (error) { toast.error(friendlyError(error)); return; }
     toast.success("Password reset link sent to your email.");
   };
 
