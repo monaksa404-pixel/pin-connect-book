@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { Building2, Copy, Smartphone, Upload, CheckCircle2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Building2, Copy, Wallet, Upload, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Settings } from "@/lib/types";
 import { sar } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
+import { useAssignedBank, useProfile } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-export type PaymentResult = { method: "bank" | "stc"; pin: string | null; screenshotPath: string | null };
+export type PaymentResult = { method: "bank" | "wallet"; screenshotPath: string | null };
 
 export async function uploadScreenshot(userId: string, file: File): Promise<string> {
-  const ext = file.name.split(".").pop() || "jpg";
+  const ext = (file.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "").slice(0, 5);
   const path = `${userId}/${Date.now()}.${ext}`;
   const { error } = await supabase.storage.from("payments").upload(path, file);
   if (error) throw error;
@@ -32,16 +33,20 @@ export function PaymentForm({
   submitLabel?: string;
   onSubmit: (r: PaymentResult) => Promise<void>;
 }) {
-  const initial = settings.bank_enabled ? "bank" : settings.stc_enabled ? "stc" : null;
-  const [method, setMethod] = useState<"bank" | "stc" | null>(initial);
-  const [pin, setPin] = useState("");
+  const { data: profile } = useProfile();
+  const { data: bank } = useAssignedBank(profile?.bank_account_id);
+  const bankOn = settings.bank_enabled && (profile?.allow_bank ?? true) && !!bank;
+  const walletOn = settings.stc_enabled && (profile?.allow_wallet ?? true);
+  const balance = Number(profile?.wallet_balance ?? 0);
+  const [pick, setPick] = useState<"bank" | "wallet" | null>(null);
+  const method = pick ?? (bankOn ? "bank" : walletOn ? "wallet" : null);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!settings.bank_enabled && !settings.stc_enabled) {
+  if (!bankOn && !walletOn) {
     return (
       <div className="rounded-2xl border border-border bg-muted p-6 text-center text-sm text-muted-foreground">
-        Online payment is temporarily unavailable. Please contact us on WhatsApp.
+        No payment method is available for your account right now. Please contact us on WhatsApp or support chat.
       </div>
     );
   }
@@ -54,28 +59,36 @@ export function PaymentForm({
 
   const submit = async () => {
     if (!method) return;
-    if (method === "stc" && !/^\d{10,20}$/.test(pin.trim())) {
-      toast.error("Enter the full recharge PIN (digits only).");
-      return;
-    }
-    if (method === "bank" && !file) {
-      toast.error("Please upload your transfer screenshot.");
-      return;
-    }
-    if (file && file.size > 5 * 1024 * 1024) {
-      toast.error("Screenshot must be under 5 MB.");
-      return;
-    }
+    if (method === "bank" && !file) return void toast.error("Please upload your transfer screenshot.");
+    if (file && file.size > 5 * 1024 * 1024) return void toast.error("Screenshot must be under 5 MB.");
+    if (method === "wallet" && balance < amount) return void toast.error("Wallet balance is too low. Recharge it first.");
     setBusy(true);
     try {
       const screenshotPath = method === "bank" && file ? await uploadScreenshot(userId, file) : null;
-      await onSubmit({ method, pin: method === "stc" ? pin.trim() : null, screenshotPath });
+      await onSubmit({ method, screenshotPath });
     } catch (e) {
       toast.error((e as Error).message || "Something went wrong");
     } finally {
       setBusy(false);
     }
   };
+
+  const Option = ({ id, icon: Icon, title, sub }: { id: "bank" | "wallet"; icon: typeof Wallet; title: string; sub: string }) => (
+    <button
+      type="button"
+      onClick={() => setPick(id)}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition",
+        method === id ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/40",
+      )}
+    >
+      <Icon className="h-6 w-6 text-primary" />
+      <div>
+        <p className="font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">{sub}</p>
+      </div>
+    </button>
+  );
 
   return (
     <div className="space-y-5">
@@ -85,61 +98,32 @@ export function PaymentForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {settings.bank_enabled && (
-          <button
-            type="button"
-            onClick={() => setMethod("bank")}
-            className={cn(
-              "flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition",
-              method === "bank" ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/40",
-            )}
-          >
-            <Building2 className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold">Bank transfer</p>
-              <p className="text-xs text-muted-foreground">Upload a screenshot</p>
-            </div>
-          </button>
-        )}
-        {settings.stc_enabled && (
-          <button
-            type="button"
-            onClick={() => setMethod("stc")}
-            className={cn(
-              "flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition",
-              method === "stc" ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/40",
-            )}
-          >
-            <Smartphone className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-semibold">STC Sawa voucher</p>
-              <p className="text-xs text-muted-foreground">Enter recharge PIN</p>
-            </div>
-          </button>
-        )}
+        {bankOn && <Option id="bank" icon={Building2} title="Bank transfer" sub="Upload a screenshot" />}
+        {walletOn && <Option id="wallet" icon={Wallet} title="Wallet balance" sub={`Available ${sar(balance)}`} />}
       </div>
 
-      {method === "bank" && (
+      {method === "bank" && bank && (
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
           {[
-            ["Bank", settings.bank_name],
-            ["Account holder", settings.account_holder],
-            ["Account number", settings.account_number],
-            ["IBAN", settings.iban],
-          ].map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{k}</p>
-                <p className="truncate font-mono text-sm font-semibold">{v}</p>
+            ["Account name", bank.account_name],
+            ["Bank", bank.bank_name],
+            ["Account holder", bank.account_holder],
+            ["Account number", bank.account_number],
+            ["IBAN", bank.iban],
+          ]
+            .filter(([, v]) => v)
+            .map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{k}</p>
+                  <p className="truncate font-mono text-sm font-semibold">{v}</p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" onClick={() => copy(v)} aria-label={`Copy ${k}`}>
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={() => copy(v)} aria-label={`Copy ${k}`}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          {settings.bank_qr_url && (
-            <img src={settings.bank_qr_url} alt="Bank QR code" className="mx-auto h-40 w-40 rounded-xl border border-border object-contain" loading="lazy" />
-          )}
+            ))}
+          {bank.qr_url && <img src={bank.qr_url} alt="Bank QR code" className="mx-auto h-40 w-40 rounded-xl border border-border object-contain" loading="lazy" />}
           <div>
             <Label htmlFor="shot">Payment screenshot</Label>
             <label
@@ -154,28 +138,24 @@ export function PaymentForm({
         </div>
       )}
 
-      {method === "stc" && (
-        <div className="space-y-3 rounded-2xl border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">
-            Buy an STC Sawa recharge card worth <strong className="text-foreground">{sar(amount)}</strong> and enter its PIN below.
-          </p>
-          <Label htmlFor="pin">Recharge PIN</Label>
-          <Input
-            id="pin"
-            inputMode="numeric"
-            maxLength={20}
-            placeholder="Enter 14-digit PIN"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            className="h-12 font-mono text-lg tracking-widest"
-          />
+      {method === "wallet" && (
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 text-sm">
+          <div className="flex justify-between"><span className="text-muted-foreground">Wallet balance</span><strong>{sar(balance)}</strong></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">This payment</span><strong>− {sar(amount)}</strong></div>
+          {balance < amount ? (
+            <p className="rounded-xl bg-destructive/10 p-3 text-destructive">
+              Not enough balance. <Link to="/wallet" className="font-semibold underline">Recharge with STC Sawa PIN</Link>
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Paid instantly from your wallet — no screenshot needed.</p>
+          )}
         </div>
       )}
 
-      <Button onClick={submit} disabled={busy || !method} className="h-12 w-full rounded-full text-base">
+      <Button onClick={submit} disabled={busy || !method || (method === "wallet" && balance < amount)} className="h-12 w-full rounded-full text-base">
         {busy ? "Submitting…" : submitLabel}
       </Button>
-      <p className="text-center text-xs text-muted-foreground">Our team verifies every payment manually, usually within minutes.</p>
+      <p className="text-center text-xs text-muted-foreground">Bank transfers are verified manually by our team, usually within minutes.</p>
     </div>
   );
 }
