@@ -383,11 +383,3 @@ create policy "media admin write" on storage.objects for all to authenticated
   using (bucket_id = 'media' and public.has_role(auth.uid(), 'admin'))
   with check (bucket_id = 'media' and public.has_role(auth.uid(), 'admin'));
 
--- =====================================================================
--- MAKE YOURSELF ADMIN: sign up on the website first, then run this
--- (replace the email) in the SQL editor:
---
--- insert into public.user_roles (user_id, role)
--- select id, 'admin' from auth.users where email = 'you@example.com'
--- on conflict do nothing;
--- =====================================================================
