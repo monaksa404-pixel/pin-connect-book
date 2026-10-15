@@ -10,7 +10,7 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Sign In — The Beauty House" },
-      { name: "description", content: "Sign in with your User ID." },
+      { name: "description", content: "Sign in with your email and password." },
     ],
   }),
   component: LoginPage,
@@ -25,19 +25,20 @@ function LoginPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { data: email, error: lookup } = await supabase.rpc("email_for_login", { p_login: login.trim() });
-    if (lookup || !email) { setBusy(false); toast.error(lookup ? friendlyError(lookup) : "Account not found."); return; }
+    const typed = login.trim();
+    const email = typed.includes("@") ? typed : (await supabase.rpc("email_for_login", { p_login: typed })).data;
+    if (!email) { setBusy(false); toast.error("Account not found."); return; }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { toast.error(friendlyError(error)); return; }
     toast.success("Welcome back");
-    navigate({ to: login.trim().toLowerCase() === "admin" ? "/admin" : "/" });
+    navigate({ to: "/" });
   };
 
   return (
-    <AuthCard title="Sign in" sub="Use your User ID. Admin uses username admin.">
+    <AuthCard title="Sign in" sub="Use the email and password from your account.">
       <form onSubmit={submit} className="space-y-4">
-        <div><Label htmlFor="u">User ID</Label><Input id="u" required value={login} onChange={(e) => setLogin(e.target.value)} placeholder="BHS-U1001" className="mt-1 h-11" /></div>
+        <div><Label htmlFor="u">Email</Label><Input id="u" required value={login} onChange={(e) => setLogin(e.target.value)} className="mt-1 h-11" /></div>
         <div><Label htmlFor="pw">Password</Label><Input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
         <Button disabled={busy} className="h-12 w-full rounded-full">{busy ? "Signing in…" : "Sign in"}</Button>
       </form>

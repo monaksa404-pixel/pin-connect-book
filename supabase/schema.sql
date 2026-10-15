@@ -77,13 +77,15 @@ create table if not exists public.settings (
   open_time time not null default '10:00',
   close_time time not null default '23:00',
   slot_minutes int not null default 30,
-  whatsapp text default '966500000000',
-  phone text default '+966 50 000 0000',
+  whatsapp text default '966534628789',
+  phone text default '+966 53 462 8789',
   address text default 'King Fahd Road, Riyadh, Saudi Arabia',
   map_url text default 'https://maps.google.com/?q=Riyadh',
   updated_at timestamptz not null default now()
 );
 insert into public.settings (id) values (1) on conflict (id) do nothing;
+update public.settings set whatsapp = '966534628789', phone = '+966 53 462 8789'
+where id = 1 and (whatsapp is null or whatsapp = '966500000000' or phone = '+966 50 000 0000');
 alter table public.settings enable row level security;
 
 drop policy if exists "settings public read" on public.settings;

@@ -35,8 +35,8 @@ export const DEFAULT_SETTINGS: Settings = {
   open_time: "10:00",
   close_time: "23:00",
   slot_minutes: 30,
-  whatsapp: "966500000000",
-  phone: "+966 50 000 0000",
+  whatsapp: "966534628789",
+  phone: "+966 53 462 8789",
   address: "King Fahd Road, Riyadh, Saudi Arabia",
   map_url: "https://maps.google.com/?q=Riyadh",
 };

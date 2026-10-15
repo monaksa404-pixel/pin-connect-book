@@ -26,39 +26,34 @@ function Index() {
 
   return (
     <>
-      <section>
-        <div className="mx-auto max-w-3xl px-4 py-6">
-          <img src="/images/sample2.png" alt="The Beauty House" className="w-full rounded-3xl" />
-          <div className="mt-6 text-center">
-            <h1 className="text-4xl font-semibold">Look good. Feel amazing.</h1>
-            <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              Choose your services, pick a time and pay {settings.advance_percent}% now. The rest is paid at the salon, unless we ask you to pay it online.
-            </p>
-            {settings.bookings_full && (
-              <p className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{settings.full_message}</p>
-            )}
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Button asChild className="h-12 rounded-full px-8"><Link to="/services">Book now</Link></Button>
-              <Button asChild variant="outline" className="h-12 rounded-full px-8"><Link to="/location">Find us</Link></Button>
-            </div>
-            <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-              <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)} daily</span>
-              <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />{settings.address}</span>
-            </div>
+      <section className="bg-gradient-to-b from-rose-100 via-pink-50 to-background">
+        <div className="mx-auto max-w-5xl px-4 py-10 text-center">
+          <img src="/images/logo.png" alt="The Beauty House" className="mx-auto h-28 w-auto" />
+          <p className="mt-6 font-display text-5xl text-rose-700 sm:text-6xl">Look good. Feel amazing.</p>
+          <p className="mx-auto mt-3 max-w-md text-muted-foreground">
+            Premium grooming. Pay {settings.advance_percent}% now and the rest at the salon.
+          </p>
+          <div className="mx-auto mt-6 flex max-w-xl flex-wrap justify-center gap-3 text-xs font-semibold uppercase tracking-wide text-rose-900">
+            <span className="rounded-full bg-white/80 px-3 py-2">Premium services</span>
+            <span className="rounded-full bg-white/80 px-3 py-2">Expert stylists</span>
+            <span className="rounded-full bg-white/80 px-3 py-2">Clean and hygienic</span>
           </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-4 py-14">
-        <h2 className="text-3xl font-semibold sm:text-4xl">Our services</h2>
-        <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {CATEGORIES.map((c) => (
-            <Link key={c} to="/services" search={{ category: c }} className="group relative overflow-hidden rounded-3xl">
-              <img src={categoryImage[c]} alt={c} loading="lazy" className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 to-transparent" />
-              <span className="absolute bottom-4 left-4 font-display text-2xl font-semibold text-background">{c}</span>
-            </Link>
-          ))}
+          {settings.bookings_full && (
+            <p className="mx-auto mt-4 max-w-lg rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{settings.full_message}</p>
+          )}
+          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+            {CATEGORIES.map((c) => (
+              <Link key={c} to="/services" search={{ category: c }} className="overflow-hidden rounded-3xl border border-rose-200 bg-neutral-950 text-white shadow-soft">
+                <img src={categoryImage[c]} alt="" className="aspect-[4/3] w-full object-cover" />
+                <p className="px-2 py-3 text-xs font-semibold uppercase tracking-wider">{c}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
+            <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-rose-600" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)} daily</span>
+            <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-rose-600" />{settings.address}</span>
+          </div>
+          <Button asChild className="mt-8 h-12 rounded-full bg-rose-600 px-10 hover:bg-rose-700"><Link to="/services">Book now</Link></Button>
         </div>
       </section>
 
