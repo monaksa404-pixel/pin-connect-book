@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin, Sparkles, Star, ShieldCheck, Wallet } from "lucide-react";
-import hero from "@/assets/hero.jpg";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES, categoryImage, fmtTime, sar, serviceImage, servicesQuery, settingsQuery, DEFAULT_SETTINGS } from "@/lib/data";
 import { useCart } from "@/lib/cart";
@@ -10,8 +9,8 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Maison Rosé — Luxury Salon Booking" },
-      { name: "description", content: "Book haircuts, beard, facial and massage services online at Maison Rosé." },
+      { title: "The Beauty House Salon" },
+      { name: "description", content: "Book haircuts, beard, facial and massage at The Beauty House." },
       { property: "og:title", content: "Maison Rosé — Luxury Salon Booking" },
       { property: "og:description", content: "Book haircuts, beard, facial and massage services online." },
     ],
@@ -27,27 +26,26 @@ function Index() {
 
   return (
     <>
-      <section className="bg-hero">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-2 md:py-20">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-primary">{settings.tagline}</p>
-            <h1 className="mt-3 text-5xl font-semibold leading-[1.05] sm:text-6xl">Look your best, effortlessly.</h1>
-            <p className="mt-4 max-w-md text-muted-foreground">
-              Choose your services, pick a time and pay just {settings.advance_percent}% upfront. The rest is paid at the salon.
+      <section>
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          <img src="/images/sample2.png" alt="The Beauty House" className="w-full rounded-3xl" />
+          <div className="mt-6 text-center">
+            <h1 className="text-4xl font-semibold">Look good. Feel amazing.</h1>
+            <p className="mx-auto mt-3 max-w-md text-muted-foreground">
+              Choose your services, pick a time and pay {settings.advance_percent}% now. The rest is paid at the salon, unless we ask you to pay it online.
             </p>
             {settings.bookings_full && (
               <p className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{settings.full_message}</p>
             )}
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button asChild className="h-12 rounded-full px-8"><Link to="/services">Book now</Link></Button>
               <Button asChild variant="outline" className="h-12 rounded-full px-8"><Link to="/location">Find us</Link></Button>
             </div>
-            <div className="mt-8 flex flex-wrap gap-6 text-sm text-muted-foreground">
+            <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
               <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)} daily</span>
               <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />{settings.address}</span>
             </div>
           </div>
-          <img src={hero} alt="Salon interior" width={1600} height={1008} className="aspect-[4/3] w-full rounded-3xl object-cover shadow-soft" />
         </div>
       </section>
 
@@ -95,7 +93,7 @@ function Index() {
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-12 sm:grid-cols-3">
           {[
             [Sparkles, "Expert stylists", "Experienced team using premium products."],
-            [Wallet, `Pay ${settings.advance_percent}% now`, "Bank transfer or STC Sawa voucher. The rest at the salon."],
+            [Wallet, `Pay ${settings.advance_percent}% now`, "Bank transfer or wallet balance. Recharge the wallet with an STC Sawa PIN."],
             [ShieldCheck, "Verified bookings", "Every payment is checked by our team."],
           ].map(([Icon, t, d]) => {
             const I = Icon as typeof Sparkles;

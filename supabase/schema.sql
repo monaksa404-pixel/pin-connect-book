@@ -671,14 +671,28 @@ begin
 end $$;
 grant execute on function public.admin_adjust_wallet(uuid, numeric) to authenticated;
 
+create or replace function public.email_for_login(p_login text)
+returns text language sql stable security definer set search_path = public as $$
+  select case
+    when lower(trim(p_login)) in ('admin', 'admin@salon.local') then 'admin@salon.local'
+    else (
+      select u.email::text from auth.users u
+      join public.profiles p on p.id = u.id
+      where upper(p.user_code) = upper(trim(p_login))
+      limit 1
+    )
+  end
+$$;
+grant execute on function public.email_for_login(text) to anon, authenticated;
+
 do $$ begin
   alter publication supabase_realtime add table public.wallet_topups;
 exception when others then null; end $$;
 
 -- =====================================================================
 -- SETUP CHECKLIST (do once in Supabase dashboard)
--- 1. Authentication → Sign In / Providers → turn ON "Allow anonymous sign-ins"
---    (customers sign up with their name only).
+-- 1. Authentication → Sign In / Providers → Email → turn OFF "Confirm email"
+--    (customers sign up with a name only; the site makes a login for them).
 -- 2. Authentication → Users → Add user → Create new user:
 --      email: admin@salon.local   password: admin1234   (tick "Auto confirm")
 --    It becomes admin automatically. On the website log in with username "admin".

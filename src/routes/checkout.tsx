@@ -65,16 +65,15 @@ function Checkout() {
         booking_time: slot.time,
         items: lines.map((l) => ({ service_id: l.service.id, name: l.service.name, price: l.service.price, qty: l.qty })),
         payment_method: p.method,
-        recharge_pin: p.pin,
         screenshot_path: p.screenshotPath,
       })
-      .select("code, total, advance_amount")
+      .select("code, advance_amount, user_code")
       .single();
     if (error) throw new Error(friendlyError(error));
     await supabase.from("profiles").update({ full_name: name.trim(), phone: phone.trim(), city: city.trim() || null }).eq("id", user!.id);
-    sendAlert(
+    await sendAlert(
       "new_booking",
-      `🆕 New booking ${data.code}\n👤 ${name} (${phone})\n📅 ${slot.date} ${fmtTime(slot.time)}\n💰 Advance ${sar(Number(data.advance_amount))} via ${p.method.toUpperCase()}${p.pin ? `\n🔢 PIN: ${p.pin}` : ""}`,
+      `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
     clear();
     toast.success(`Booking ${data.code} submitted!`);

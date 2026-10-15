@@ -19,6 +19,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Toaster } from "@/components/ui/sonner";
+import { ReasonPopup } from "@/components/ReasonPopup";
 
 function NotFoundComponent() {
   return (
@@ -83,7 +84,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Maison Rosé — Luxury Salon Booking" },
+      { title: "The Beauty House Salon" },
       { name: "description", content: "Book haircuts, beard, facial and massage services online." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -137,6 +138,7 @@ function RootComponent() {
             <Outlet />
           </main>
           {!isAdmin && <SiteFooter />}
+          <ReasonPopup />
           <Toaster richColors position="top-center" />
         </CartProvider>
       </AuthProvider>

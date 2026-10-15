@@ -11,6 +11,10 @@ export async function sendAlert(event: string, message: string) {
     console.error(e);
   }
   if (isSupabaseConfigured) {
-    await supabase.from("telegram_logs").insert({ event, message, status });
+    try {
+      await supabase.from("telegram_logs").insert({ event, message, status });
+    } catch (e) {
+      console.error(e);
+    }
   }
 }

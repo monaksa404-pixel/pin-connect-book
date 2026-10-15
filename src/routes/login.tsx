@@ -9,10 +9,8 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign In — Maison Rosé" },
-      { name: "description", content: "Sign in to book and track your salon appointments." },
-      { property: "og:title", content: "Sign In — Maison Rosé" },
-      { property: "og:description", content: "Sign in to your Maison Rosé account." },
+      { title: "Sign In — The Beauty House" },
+      { name: "description", content: "Sign in with your User ID." },
     ],
   }),
   component: LoginPage,
@@ -20,34 +18,28 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { data: email, error: lookup } = await supabase.rpc("email_for_login", { p_login: login.trim() });
+    if (lookup || !email) { setBusy(false); toast.error(lookup ? friendlyError(lookup) : "Account not found."); return; }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { toast.error(friendlyError(error)); return; }
-    toast.success("Welcome back!");
-    navigate({ to: "/" });
-  };
-
-  const reset = async () => {
-    if (!email) { toast.error("Enter your email first."); return; }
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + "/login" });
-    if (error) { toast.error(friendlyError(error)); return; }
-    toast.success("Password reset link sent to your email.");
+    toast.success("Welcome back");
+    navigate({ to: login.trim().toLowerCase() === "admin" ? "/admin" : "/" });
   };
 
   return (
-    <AuthCard title="Welcome back" sub="Sign in to manage your bookings.">
+    <AuthCard title="Sign in" sub="Use your User ID. Admin uses username admin.">
       <form onSubmit={submit} className="space-y-4">
-        <div><Label htmlFor="e">Email</Label><Input id="e" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 h-11" /></div>
+        <div><Label htmlFor="u">User ID</Label><Input id="u" required value={login} onChange={(e) => setLogin(e.target.value)} placeholder="BHS-U1001" className="mt-1 h-11" /></div>
         <div><Label htmlFor="pw">Password</Label><Input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
         <Button disabled={busy} className="h-12 w-full rounded-full">{busy ? "Signing in…" : "Sign in"}</Button>
-        <button type="button" onClick={reset} className="w-full text-center text-xs text-muted-foreground hover:text-primary">Forgot password?</button>
       </form>
       <p className="mt-6 text-center text-sm text-muted-foreground">New here? <Link to="/signup" className="font-semibold text-primary">Create an account</Link></p>
     </AuthCard>
@@ -56,9 +48,10 @@ function LoginPage() {
 
 export function AuthCard({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
   return (
-    <div className="bg-hero px-4 py-16">
+    <div className="px-4 py-16">
       <div className="mx-auto max-w-md rounded-3xl border border-border bg-card p-8 shadow-soft">
-        <h1 className="text-4xl font-semibold">{title}</h1>
+        <img src="/images/logo.png" alt="The Beauty House" className="mb-4 h-16 w-auto" />
+        <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">{sub}</p>
         {children}
       </div>

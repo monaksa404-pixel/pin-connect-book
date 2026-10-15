@@ -12,6 +12,7 @@ const NAV = [
   { to: "/", label: "Home" },
   { to: "/services", label: "Services" },
   { to: "/my-bookings", label: "My Bookings" },
+  { to: "/wallet", label: "Wallet" },
   { to: "/location", label: "Location" },
   { to: "/support", label: "Support" },
 ] as const;
@@ -38,11 +39,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-rose font-display text-lg font-semibold text-primary-foreground">
-            {(settings?.salon_name ?? "M").charAt(0)}
-          </span>
-          <span className="font-display text-xl font-semibold tracking-tight">{settings?.salon_name ?? "Maison Rosé"}</span>
+        <Link to="/" className="flex items-center">
+          <img src="/images/logo.png" alt={settings?.salon_name ?? "The Beauty House"} className="h-12 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">

@@ -33,7 +33,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
     setText("");
     const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body });
     if (error) { toast.error(error.message); return; }
-    if (as === "user") sendAlert("support", `💬 New support message:\n${body}`);
+    if (as === "user") await sendAlert("support", `New support message:\n${body}`);
     qc.invalidateQueries({ queryKey: ["chat", userId] });
   };
 

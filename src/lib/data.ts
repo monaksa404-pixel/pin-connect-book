@@ -19,8 +19,8 @@ export const serviceImage = (s: Pick<Service, "image_url" | "category">) =>
   s.image_url || categoryImage[s.category] || hero;
 
 export const DEFAULT_SETTINGS: Settings = {
-  salon_name: "Maison Rosé",
-  tagline: "Luxury grooming & beauty studio",
+  salon_name: "The Beauty House",
+  tagline: "Men's salon",
   bank_name: "Al Rajhi Bank",
   account_holder: "Maison Rose Salon",
   account_number: "000000000000",

@@ -6,7 +6,7 @@ import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, sar, settingsQuery } from "@/lib/data";
-import type { Booking, Service, Settings } from "@/lib/types";
+import type { BankAccount, Booking, Profile, Service, Settings, Topup } from "@/lib/types";
 import { RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,11 +49,14 @@ function Admin() {
       <div className="mx-auto max-w-7xl px-4 py-6">
         <Tabs defaultValue="bookings">
           <TabsList className="mb-6 flex h-auto flex-wrap justify-start">
-            {["bookings", "services", "settings", "support", "telegram"].map((t) => (
+            {["bookings", "customers", "banks", "wallet", "services", "settings", "support", "telegram"].map((t) => (
               <TabsTrigger key={t} value={t} className="capitalize">{t}</TabsTrigger>
             ))}
           </TabsList>
           <TabsContent value="bookings"><BookingsTab /></TabsContent>
+          <TabsContent value="customers"><CustomersTab /></TabsContent>
+          <TabsContent value="banks"><BanksTab /></TabsContent>
+          <TabsContent value="wallet"><WalletTab /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>
           <TabsContent value="support"><SupportTab /></TabsContent>
@@ -159,6 +162,18 @@ function Shot({ path }: { path: string | null }) {
 function BookingDetail({ b }: { b: Booking }) {
   const qc = useQueryClient();
   const [extra, setExtra] = useState(String(b.extra_amount || b.remaining_amount));
+  const [reason, setReason] = useState(b.admin_note ?? "");
+  const [form, setForm] = useState({
+    customer_name: b.customer_name,
+    phone: b.phone,
+    city: b.city ?? "",
+    booking_date: b.booking_date,
+    booking_time: String(b.booking_time).slice(0, 5),
+    total: String(b.total),
+    advance_amount: String(b.advance_amount),
+    remaining_amount: String(b.remaining_amount),
+    notes: b.notes ?? "",
+  });
   const update = async (patch: Partial<Booking>, msg: string) => {
     const { error } = await supabase.from("bookings").update(patch).eq("id", b.id);
     if (error) { toast.error(error.message); return; }
@@ -175,6 +190,28 @@ function BookingDetail({ b }: { b: Booking }) {
   return (
     <>
       <DialogHeader><DialogTitle className="font-display text-2xl">Booking {b.code}</DialogTitle></DialogHeader>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div><Label>Name</Label><Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
+        <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+        <div><Label>City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+        <div><Label>Date</Label><Input type="date" value={form.booking_date} onChange={(e) => setForm({ ...form, booking_date: e.target.value })} /></div>
+        <div><Label>Time</Label><Input type="time" value={form.booking_time} onChange={(e) => setForm({ ...form, booking_time: e.target.value })} /></div>
+        <div><Label>Total</Label><Input type="number" value={form.total} onChange={(e) => setForm({ ...form, total: e.target.value })} /></div>
+        <div><Label>Advance</Label><Input type="number" value={form.advance_amount} onChange={(e) => setForm({ ...form, advance_amount: e.target.value })} /></div>
+        <div><Label>Remaining</Label><Input type="number" value={form.remaining_amount} onChange={(e) => setForm({ ...form, remaining_amount: e.target.value })} /></div>
+        <div className="sm:col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+        <Button className="sm:col-span-2" onClick={() => update({
+          customer_name: form.customer_name,
+          phone: form.phone,
+          city: form.city || null,
+          booking_date: form.booking_date,
+          booking_time: form.booking_time,
+          total: Number(form.total),
+          advance_amount: Number(form.advance_amount),
+          remaining_amount: Number(form.remaining_amount),
+          notes: form.notes || null,
+        }, "Booking updated")}>Save changes</Button>
+      </div>
       <div className="grid gap-4 text-sm sm:grid-cols-2">
         <div className="space-y-1">
           <p><strong>{b.customer_name}</strong> · {b.phone}{b.city ? ` · ${b.city}` : ""}</p>
@@ -187,9 +224,10 @@ function BookingDetail({ b }: { b: Booking }) {
           <div className="flex items-center justify-between"><p className="font-semibold">Advance payment ({b.payment_method.toUpperCase()})</p><StatusBadge status={b.payment_status} /></div>
           {b.recharge_pin && <p className="font-mono text-base">PIN: {b.recharge_pin}</p>}
           <Shot path={b.screenshot_path} />
+          <div><Label>Reason shown to the customer</Label><Input value={reason} onChange={(e) => setReason(e.target.value)} /></div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => update({ payment_status: "verified", status: "confirmed" }, "Payment approved")}>Approve</Button>
-            <Button size="sm" variant="destructive" onClick={() => update({ payment_status: "rejected" }, "Payment rejected")}>Reject</Button>
+            <Button size="sm" onClick={() => update({ payment_status: "verified", status: "confirmed", admin_note: reason }, "Payment approved")}>Approve</Button>
+            <Button size="sm" variant="destructive" onClick={() => update({ payment_status: "rejected", admin_note: reason }, "Payment rejected")}>Reject</Button>
           </div>
         </div>
       </div>
@@ -216,13 +254,184 @@ function BookingDetail({ b }: { b: Booking }) {
         <Shot path={b.extra_screenshot_path} />
         {b.extra_payment_status === "under_verification" && (
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => update({ extra_payment_status: "verified" }, "Balance approved")}>Approve</Button>
-            <Button size="sm" variant="destructive" onClick={() => update({ extra_payment_status: "rejected" }, "Balance rejected")}>Reject</Button>
+            <Button size="sm" onClick={() => update({ extra_payment_status: "verified", extra_admin_note: reason }, "Balance approved")}>Approve</Button>
+            <Button size="sm" variant="destructive" onClick={() => update({ extra_payment_status: "rejected", extra_admin_note: reason }, "Balance rejected")}>Reject</Button>
           </div>
         )}
       </div>
       <Button variant="ghost" size="sm" className="justify-self-start text-destructive" onClick={del}><Trash2 className="mr-1 h-4 w-4" />Delete booking</Button>
     </>
+  );
+}
+
+function CustomersTab() {
+  const qc = useQueryClient();
+  const { data: people = [] } = useQuery({
+    queryKey: ["admin-customers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Profile[];
+    },
+  });
+  const { data: banks = [] } = useQuery({
+    queryKey: ["admin-banks"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("bank_accounts").select("*").order("created_at");
+      if (error) throw error;
+      return data as BankAccount[];
+    },
+  });
+  const save = async (p: Profile, patch: { allow_bank: boolean; allow_wallet: boolean; bank_account_id: string | null }) => {
+    const { error } = await supabase.rpc("admin_update_customer", { p_user: p.id, p_allow_bank: patch.allow_bank, p_allow_wallet: patch.allow_wallet, p_bank: patch.bank_account_id });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Customer updated");
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+  return (
+    <div className="space-y-3">
+      {people.map((p) => (
+        <CustomerRow key={p.id} person={p} banks={banks} onSave={(patch) => save(p, patch)} />
+      ))}
+    </div>
+  );
+}
+
+function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAccount[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; bank_account_id: string | null }) => void }) {
+  const [allowBank, setAllowBank] = useState(person.allow_bank);
+  const [allowWallet, setAllowWallet] = useState(person.allow_wallet);
+  const [bankId, setBankId] = useState(person.bank_account_id ?? "");
+  const [delta, setDelta] = useState("");
+  const qc = useQueryClient();
+  const adjust = async () => {
+    const n = Number(delta);
+    if (!n) return;
+    const { error } = await supabase.rpc("admin_adjust_wallet", { p_user: person.id, p_delta: n });
+    if (error) { toast.error(error.message); return; }
+    setDelta("");
+    toast.success("Wallet updated");
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+  return (
+    <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-2">
+      <div>
+        <p className="font-semibold">{person.full_name || "No name"} <span className="font-mono text-xs text-muted-foreground">{person.user_code}</span></p>
+        <p className="text-sm text-muted-foreground">{person.phone} · Wallet {person.wallet_balance} SAR</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <label className="flex items-center gap-2">Bank <Switch checked={allowBank} onCheckedChange={setAllowBank} /></label>
+        <label className="flex items-center gap-2">Wallet <Switch checked={allowWallet} onCheckedChange={setAllowWallet} /></label>
+        <select value={bankId} onChange={(e) => setBankId(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+          <option value="">No bank</option>
+          {banks.map((b) => <option key={b.id} value={b.id}>{b.account_name}</option>)}
+        </select>
+        <Button size="sm" onClick={() => onSave({ allow_bank: allowBank, allow_wallet: allowWallet, bank_account_id: bankId || null })}>Save</Button>
+        <Input className="w-24" placeholder="+/- SAR" value={delta} onChange={(e) => setDelta(e.target.value)} />
+        <Button size="sm" variant="outline" onClick={adjust}>Adjust wallet</Button>
+      </div>
+    </div>
+  );
+}
+
+function BanksTab() {
+  const qc = useQueryClient();
+  const blank = { account_name: "", bank_name: "", account_holder: "", account_number: "", iban: "", qr_url: null as string | null, active: true };
+  const [edit, setEdit] = useState<(typeof blank & { id?: string }) | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const { data = [] } = useQuery({
+    queryKey: ["admin-banks"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("bank_accounts").select("*").order("created_at");
+      if (error) throw error;
+      return data as BankAccount[];
+    },
+  });
+  const save = async () => {
+    if (!edit?.account_name || !edit.iban || !edit.account_holder) { toast.error("Name, holder and IBAN are required"); return; }
+    let qr_url = edit.qr_url;
+    if (file) {
+      const path = `banks/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, "")}`;
+      const { error } = await supabase.storage.from("media").upload(path, file);
+      if (error) { toast.error(error.message); return; }
+      qr_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+    }
+    const row = { account_name: edit.account_name, bank_name: edit.bank_name, account_holder: edit.account_holder, account_number: edit.account_number, iban: edit.iban, qr_url, active: edit.active };
+    const { error } = edit.id ? await supabase.from("bank_accounts").update(row).eq("id", edit.id) : await supabase.from("bank_accounts").insert(row);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Bank saved");
+    setEdit(null); setFile(null);
+    qc.invalidateQueries({ queryKey: ["admin-banks"] });
+  };
+  return (
+    <div className="space-y-3">
+      <Button className="rounded-full" onClick={() => setEdit({ ...blank })}><Plus className="mr-1 h-4 w-4" />Add bank account</Button>
+      {data.map((b) => (
+        <div key={b.id} className="flex items-center justify-between rounded-2xl border border-border bg-card p-4">
+          <div>
+            <p className="font-semibold">{b.account_name} {!b.active && <span className="text-xs text-destructive">Disabled</span>}</p>
+            <p className="text-xs text-muted-foreground">{b.account_holder} · {b.iban}</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setEdit(b)}>Edit</Button>
+        </div>
+      ))}
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent>
+          {edit && (
+            <div className="space-y-3">
+              <DialogHeader><DialogTitle>{edit.id ? "Edit bank" : "New bank"}</DialogTitle></DialogHeader>
+              {(["account_name", "bank_name", "account_holder", "account_number", "iban"] as const).map((k) => (
+                <div key={k}><Label className="capitalize">{k.replace("_", " ")}</Label><Input value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} /></div>
+              ))}
+              <div><Label>QR code</Label><Input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div>
+              <label className="flex items-center gap-2 text-sm">Active <Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} /></label>
+              <Button className="w-full" onClick={save}>Save</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function WalletTab() {
+  const qc = useQueryClient();
+  const [reason, setReason] = useState("");
+  const [amount, setAmount] = useState("");
+  const { data = [] } = useQuery({
+    queryKey: ["admin-topups"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("wallet_topups").select("*").order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      return data as Topup[];
+    },
+  });
+  const review = async (t: Topup, approve: boolean) => {
+    const { error } = await supabase.rpc("review_topup", { p_id: t.id, p_approve: approve, p_amount: Number(amount || t.amount), p_reason: reason });
+    if (error) { toast.error(error.message); return; }
+    toast.success(approve ? "Wallet credited" : "PIN rejected");
+    setReason("");
+    qc.invalidateQueries({ queryKey: ["admin-topups"] });
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">The PIN is shown here only. Telegram gets the reference, not the PIN.</p>
+      {data.map((t) => (
+        <div key={t.id} className="rounded-2xl border border-border bg-card p-4 text-sm">
+          <div className="flex justify-between"><p className="font-mono">{t.ref} · {t.user_code}</p><StatusBadge status={t.status} /></div>
+          <p className="mt-1 font-mono text-base">PIN {t.pin}</p>
+          <p>{t.amount} SAR</p>
+          {t.status === "pending" && (
+            <div className="mt-2 flex flex-wrap items-end gap-2">
+              <Input className="w-28" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input className="w-56" placeholder="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+              <Button size="sm" onClick={() => review(t, true)}>Approve</Button>
+              <Button size="sm" variant="destructive" onClick={() => review(t, false)}>Reject</Button>
+            </div>
+          )}
+          {t.reason && <p className="mt-1 text-muted-foreground">{t.reason}</p>}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -341,7 +550,7 @@ function SettingsTab() {
         {toggle("bookings_full", "Bookings full (too many customers)")}
         {text("full_message", "Message shown when full")}
         {toggle("bank_enabled", "Bank transfer enabled")}
-        {toggle("stc_enabled", "STC Sawa voucher enabled")}
+        {toggle("stc_enabled", "Wallet recharge (STC Sawa) enabled")}
         {text("advance_percent", "Advance %", "number")}
         <div className="grid grid-cols-3 gap-2">{text("open_time", "Opens", "time")}{text("close_time", "Closes", "time")}{text("slot_minutes", "Slot (min)", "number")}</div>
       </section>

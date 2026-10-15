@@ -59,9 +59,9 @@ function MyBookings() {
   const onPay = async (r: PaymentResult) => {
     if (!pay) return;
     const fn = pay.kind === "extra" ? "submit_extra_payment" : "resubmit_payment";
-    const { error } = await supabase.rpc(fn, { p_booking: pay.booking.id, p_method: r.method, p_pin: r.pin, p_screenshot: r.screenshotPath });
+    const { error } = await supabase.rpc(fn, { p_booking: pay.booking.id, p_method: r.method, p_screenshot: r.screenshotPath });
     if (error) throw new Error(friendlyError(error));
-    sendAlert(pay.kind, `💳 ${pay.kind === "extra" ? "Balance payment" : "Payment resubmitted"} for ${pay.booking.code} via ${r.method.toUpperCase()}${r.pin ? `\n🔢 PIN: ${r.pin}` : ""}`);
+    await sendAlert(pay.kind, `${pay.kind === "extra" ? "Balance payment" : "Payment resubmitted"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nvia ${r.method}`);
     toast.success("Payment submitted for verification.");
     setPay(null);
     qc.invalidateQueries({ queryKey: ["my-bookings"] });
