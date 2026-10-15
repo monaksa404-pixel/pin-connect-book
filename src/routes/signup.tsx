@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase, friendlyError, isSupabaseConfigured } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
+import { createAccount } from "@/lib/signup.functions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -30,22 +31,11 @@ function SignupPage() {
     if (f.name.trim().length < 2) { toast.error("Enter your full name."); return; }
     if (f.password.length < 6) { toast.error("Password must be at least 6 characters."); return; }
     setBusy(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: f.email.trim(),
-      password: f.password,
-      options: { data: { full_name: f.name.trim(), phone: f.phone.trim() } },
-    });
-    if (error || !data.user) { setBusy(false); toast.error(friendlyError(error)); return; }
-    if (!data.session) {
-      const again = await supabase.auth.signInWithPassword({ email: f.email.trim(), password: f.password });
-      if (again.error) {
-        setBusy(false);
-        toast.success("Account created. Confirm your email, then sign in.");
-        navigate({ to: "/login" });
-        return;
-      }
-    }
-    const { data: profile } = await supabase.from("profiles").select("user_code").eq("id", data.user.id).maybeSingle();
+    const created = await createAccount({ data: { name: f.name.trim(), phone: f.phone.trim(), email: f.email.trim(), password: f.password } });
+    if (!created.ok) { setBusy(false); toast.error(friendlyError({ message: created.error })); return; }
+    const { data: session, error } = await supabase.auth.signInWithPassword({ email: f.email.trim(), password: f.password });
+    if (error || !session.user) { setBusy(false); toast.error(friendlyError(error)); return; }
+    const { data: profile } = await supabase.from("profiles").select("user_code").eq("id", session.user.id).maybeSingle();
     await sendAlert("new_user", `New user registered\nName: ${f.name.trim()}\nPhone: ${f.phone.trim()}\nUser ID: ${profile?.user_code ?? ""}`);
     setBusy(false);
     toast.success("Account created");
