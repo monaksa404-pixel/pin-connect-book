@@ -21,6 +21,9 @@ export function friendlyError(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? String(e);
   if (msg.includes("BOOKINGS_FULL")) return "Bookings are currently unavailable. Please try later.";
   if (msg.includes("BANK_DISABLED")) return "Bank transfer is currently turned off.";
+  if (msg.includes("WALLET_DISABLED")) return "Wallet payment is not available for your account.";
+  if (msg.includes("LOW_BALANCE")) return "Your wallet balance is too low. Recharge it with an STC Sawa PIN first.";
+  if (msg.includes("anonymous") || msg.includes("Anonymous")) return "Sign-up is not switched on yet (admin must enable anonymous sign-ins).";
   if (msg.includes("STC_DISABLED")) return "STC voucher payment is currently turned off.";
   if (msg.includes("INVALID_PIN") || msg.includes("STC_INVALID")) return "Please enter a valid STC recharge PIN.";
   if (msg.includes("SCREENSHOT_REQUIRED") || msg.includes("BANK_INVALID")) return "Please upload your payment screenshot.";
