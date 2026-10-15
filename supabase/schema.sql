@@ -383,3 +383,307 @@ create policy "media admin write" on storage.objects for all to authenticated
   using (bucket_id = 'media' and public.has_role(auth.uid(), 'admin'))
   with check (bucket_id = 'media' and public.has_role(auth.uid(), 'admin'));
 
+-- =====================================================================
+-- PART 2 — User IDs, bank accounts per customer, wallet (STC Sawa top-up),
+-- approval reasons. Runs after part 1 in the same file.
+-- =====================================================================
+
+-- ---------- Profiles: user code, wallet, allowed methods ----------
+create sequence if not exists public.user_code_seq start 1001;
+alter table public.profiles add column if not exists user_code text unique;
+alter table public.profiles add column if not exists wallet_balance numeric(10,2) not null default 0;
+alter table public.profiles add column if not exists allow_bank boolean not null default true;
+alter table public.profiles add column if not exists allow_wallet boolean not null default true;
+alter table public.profiles add column if not exists bank_account_id uuid;
+update public.profiles set user_code = 'BHS-U' || nextval('public.user_code_seq') where user_code is null;
+
+-- Customers may only edit their own name/phone/city. Wallet + methods are admin-only (via RPC).
+revoke update on public.profiles from authenticated;
+grant update (full_name, phone, city) on public.profiles to authenticated;
+
+-- ---------- Bank accounts ----------
+create table if not exists public.bank_accounts (
+  id uuid primary key default gen_random_uuid(),
+  account_name text not null,
+  bank_name text,
+  account_holder text not null,
+  account_number text,
+  iban text not null,
+  qr_url text,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+grant select, insert, update, delete on public.bank_accounts to authenticated;
+grant all on public.bank_accounts to service_role;
+alter table public.bank_accounts enable row level security;
+drop policy if exists "bank read" on public.bank_accounts;
+create policy "bank read" on public.bank_accounts for select to authenticated
+  using (public.has_role(auth.uid(), 'admin')
+    or (active and id = (select bank_account_id from public.profiles where id = auth.uid())));
+drop policy if exists "bank admin all" on public.bank_accounts;
+create policy "bank admin all" on public.bank_accounts for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+
+do $$ begin
+  alter table public.profiles add constraint profiles_bank_fk
+    foreign key (bank_account_id) references public.bank_accounts(id) on delete set null;
+exception when duplicate_object then null; end $$;
+
+insert into public.bank_accounts (account_name, bank_name, account_holder, account_number, iban)
+select 'Riyadh Main Account', 'Al Rajhi Bank', 'The Beauty House Salon', '000000000000', 'SA0000000000000000000000'
+where not exists (select 1 from public.bank_accounts);
+
+-- ---------- New user: code + admin auto-role ----------
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, full_name, phone, user_code, bank_account_id)
+  values (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone',
+          'BHS-U' || nextval('public.user_code_seq'),
+          (select id from public.bank_accounts where active order by created_at limit 1))
+  on conflict (id) do nothing;
+  insert into public.user_roles (user_id, role) values (new.id, 'user') on conflict do nothing;
+  if lower(coalesce(new.email, '')) = 'admin@salon.local' then
+    insert into public.user_roles (user_id, role) values (new.id, 'admin') on conflict do nothing;
+  end if;
+  return new;
+end $$;
+
+-- ---------- Bookings: methods are now bank | wallet ----------
+alter table public.bookings drop constraint if exists bookings_payment_method_check;
+alter table public.bookings drop constraint if exists bookings_extra_method_check;
+update public.bookings set payment_method = 'wallet' where payment_method = 'stc';
+update public.bookings set extra_method = 'wallet' where extra_method = 'stc';
+alter table public.bookings add constraint bookings_payment_method_check check (payment_method in ('bank', 'wallet'));
+alter table public.bookings add constraint bookings_extra_method_check check (extra_method in ('bank', 'wallet'));
+alter table public.bookings add column if not exists bank_account_id uuid references public.bank_accounts(id) on delete set null;
+alter table public.bookings add column if not exists user_code text;
+alter table public.bookings add column if not exists extra_admin_note text;
+alter table public.bookings alter column code set default ('BHS-' || lpad((floor(random() * 1000000))::int::text, 6, '0'));
+
+drop policy if exists "bookings insert own" on public.bookings;
+create policy "bookings insert own" on public.bookings for insert to authenticated
+  with check (user_id = auth.uid());
+
+create or replace function public.bookings_before_insert()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  s public.settings; p public.profiles; it jsonb; svc public.services;
+  q int; tot numeric := 0; clean jsonb := '[]'::jsonb;
+begin
+  select * into s from public.settings where id = 1;
+  select * into p from public.profiles where id = new.user_id;
+  if s.bookings_full then raise exception 'BOOKINGS_FULL'; end if;
+
+  -- force safe values; customers can't self-approve
+  new.status := 'pending'; new.payment_status := 'pending';
+  new.extra_enabled := false; new.extra_payment_status := 'none'; new.extra_amount := 0;
+  new.admin_note := null; new.recharge_pin := null; new.user_code := p.user_code;
+
+  for it in select * from jsonb_array_elements(new.items) loop
+    select * into svc from public.services where id = (it->>'service_id')::uuid and active;
+    if svc.id is null then raise exception 'INVALID_SERVICE'; end if;
+    q := greatest(1, least(10, coalesce((it->>'qty')::int, 1)));
+    tot := tot + svc.price * q;
+    clean := clean || jsonb_build_object('service_id', svc.id, 'name', svc.name, 'price', svc.price, 'qty', q);
+  end loop;
+  if jsonb_array_length(clean) = 0 then raise exception 'EMPTY_CART'; end if;
+  new.items := clean; new.total := tot;
+  new.advance_amount := round(tot * s.advance_percent / 100.0, 2);
+  new.remaining_amount := tot - new.advance_amount;
+
+  if new.payment_method = 'bank' then
+    if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
+    if new.screenshot_path is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
+    new.bank_account_id := p.bank_account_id;
+  elsif new.payment_method = 'wallet' then
+    if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
+    if p.wallet_balance < new.advance_amount then raise exception 'LOW_BALANCE'; end if;
+    update public.profiles set wallet_balance = wallet_balance - new.advance_amount where id = p.id;
+    new.screenshot_path := null;
+    new.payment_status := 'verified'; new.status := 'confirmed';
+  end if;
+  return new;
+end $$;
+
+-- Notifications: popup flag for admin reasons
+alter table public.notifications add column if not exists popup boolean not null default false;
+alter table public.notifications add column if not exists kind text;
+
+create or replace function public.bookings_after_update()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare r text;
+begin
+  new.updated_at := now();
+  if new.payment_status is distinct from old.payment_status and new.payment_status in ('verified', 'rejected') then
+    r := coalesce(nullif(trim(new.admin_note), ''), case when new.payment_status = 'verified' then 'Your payment was received.' else 'Your payment could not be verified.' end);
+    insert into public.notifications(user_id, booking_id, title, body, popup, kind)
+    values (new.user_id, new.id,
+      case when new.payment_status = 'verified' then 'Payment approved — ' || new.code else 'Payment rejected — ' || new.code end,
+      r, true, case when new.payment_status = 'verified' then 'approved' else 'rejected' end);
+  end if;
+  if new.status is distinct from old.status then
+    if new.status = 'completed' then
+      insert into public.notifications(user_id, booking_id, title, body) values (new.user_id, new.id, 'Service completed', 'Thank you for visiting! Booking ' || new.code || ' is complete.');
+    elsif new.status = 'cancelled' then
+      insert into public.notifications(user_id, booking_id, title, body, popup, kind) values (new.user_id, new.id, 'Appointment cancelled — ' || new.code, coalesce(nullif(trim(new.admin_note), ''), 'Your appointment has been cancelled.'), true, 'rejected');
+    elsif new.status = 'confirmed' and new.payment_status = old.payment_status then
+      insert into public.notifications(user_id, booking_id, title, body) values (new.user_id, new.id, 'Appointment confirmed', 'Booking ' || new.code || ' is confirmed.');
+    end if;
+  end if;
+  if new.extra_payment_status is distinct from old.extra_payment_status then
+    if new.extra_payment_status = 'awaiting' then
+      insert into public.notifications(user_id, booking_id, title, body, popup, kind) values (new.user_id, new.id, 'Pay remaining balance online', 'You can now pay the remaining ' || new.extra_amount || ' SAR for booking ' || new.code || ' online.', false, null);
+    elsif new.extra_payment_status in ('verified', 'rejected') then
+      insert into public.notifications(user_id, booking_id, title, body, popup, kind) values (new.user_id, new.id,
+        case when new.extra_payment_status = 'verified' then 'Balance payment approved — ' else 'Balance payment rejected — ' end || new.code,
+        coalesce(nullif(trim(new.extra_admin_note), ''), case when new.extra_payment_status = 'verified' then 'Your remaining balance was received.' else 'Your balance payment could not be verified.' end),
+        true, case when new.extra_payment_status = 'verified' then 'approved' else 'rejected' end);
+    end if;
+  end if;
+  return new;
+end $$;
+
+-- Pay again / pay balance — bank screenshot or wallet balance
+drop function if exists public.resubmit_payment(uuid, text, text, text);
+drop function if exists public.submit_extra_payment(uuid, text, text, text);
+
+create or replace function public.resubmit_payment(p_booking uuid, p_method text, p_screenshot text)
+returns void language plpgsql security definer set search_path = public as $$
+declare b public.bookings; s public.settings; p public.profiles;
+begin
+  select * into b from public.bookings where id = p_booking and user_id = auth.uid() for update;
+  if b.id is null then raise exception 'NOT_FOUND'; end if;
+  if b.payment_status <> 'rejected' then raise exception 'NOT_REJECTED'; end if;
+  select * into s from public.settings where id = 1;
+  select * into p from public.profiles where id = auth.uid() for update;
+  if p_method = 'bank' then
+    if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
+    if p_screenshot is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
+    update public.bookings set payment_method = 'bank', screenshot_path = p_screenshot, bank_account_id = p.bank_account_id,
+      payment_status = 'pending', admin_note = null where id = p_booking;
+  elsif p_method = 'wallet' then
+    if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
+    if p.wallet_balance < b.advance_amount then raise exception 'LOW_BALANCE'; end if;
+    update public.profiles set wallet_balance = wallet_balance - b.advance_amount where id = p.id;
+    update public.bookings set payment_method = 'wallet', screenshot_path = null, payment_status = 'verified',
+      status = case when status = 'pending' then 'confirmed' else status end, admin_note = 'Paid from wallet balance.' where id = p_booking;
+  else raise exception 'BAD_METHOD'; end if;
+end $$;
+
+create or replace function public.submit_extra_payment(p_booking uuid, p_method text, p_screenshot text)
+returns void language plpgsql security definer set search_path = public as $$
+declare b public.bookings; s public.settings; p public.profiles;
+begin
+  select * into b from public.bookings where id = p_booking and user_id = auth.uid() for update;
+  if b.id is null then raise exception 'NOT_FOUND'; end if;
+  if not b.extra_enabled or b.extra_payment_status not in ('awaiting', 'rejected') then raise exception 'NOT_ALLOWED'; end if;
+  select * into s from public.settings where id = 1;
+  select * into p from public.profiles where id = auth.uid() for update;
+  if p_method = 'bank' then
+    if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
+    if p_screenshot is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
+    update public.bookings set extra_method = 'bank', extra_screenshot_path = p_screenshot,
+      extra_payment_status = 'under_verification', extra_admin_note = null where id = p_booking;
+  elsif p_method = 'wallet' then
+    if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
+    if p.wallet_balance < b.extra_amount then raise exception 'LOW_BALANCE'; end if;
+    update public.profiles set wallet_balance = wallet_balance - b.extra_amount where id = p.id;
+    update public.bookings set extra_method = 'wallet', extra_screenshot_path = null,
+      extra_payment_status = 'verified', extra_admin_note = 'Paid from wallet balance.' where id = p_booking;
+  else raise exception 'BAD_METHOD'; end if;
+end $$;
+grant execute on function public.resubmit_payment(uuid, text, text) to authenticated;
+grant execute on function public.submit_extra_payment(uuid, text, text) to authenticated;
+
+-- ---------- Wallet top-ups (STC Sawa PIN) ----------
+create table if not exists public.wallet_topups (
+  id uuid primary key default gen_random_uuid(),
+  ref text not null unique default ('TOP-' || upper(substr(md5(random()::text), 1, 6))),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_code text,
+  pin text not null check (pin ~ '^[0-9]{14}$'),
+  amount numeric(10,2) not null check (amount > 0 and amount <= 5000),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reason text,
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+grant select, insert on public.wallet_topups to authenticated;
+grant all on public.wallet_topups to service_role;
+alter table public.wallet_topups enable row level security;
+drop policy if exists "topup read" on public.wallet_topups;
+create policy "topup read" on public.wallet_topups for select to authenticated
+  using (user_id = auth.uid() or public.has_role(auth.uid(), 'admin'));
+drop policy if exists "topup insert own" on public.wallet_topups;
+create policy "topup insert own" on public.wallet_topups for insert to authenticated
+  with check (user_id = auth.uid() and status = 'pending' and reason is null);
+
+create or replace function public.topup_before_insert()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare s public.settings; p public.profiles;
+begin
+  select * into s from public.settings where id = 1;
+  select * into p from public.profiles where id = new.user_id;
+  if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
+  new.user_code := p.user_code;
+  return new;
+end $$;
+drop trigger if exists topup_before_insert on public.wallet_topups;
+create trigger topup_before_insert before insert on public.wallet_topups
+  for each row execute function public.topup_before_insert();
+
+create or replace function public.review_topup(p_id uuid, p_approve boolean, p_amount numeric, p_reason text)
+returns void language plpgsql security definer set search_path = public as $$
+declare t public.wallet_topups;
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  select * into t from public.wallet_topups where id = p_id for update;
+  if t.id is null or t.status <> 'pending' then raise exception 'NOT_PENDING'; end if;
+  if p_approve then
+    if coalesce(p_amount, 0) <= 0 then raise exception 'BAD_AMOUNT'; end if;
+    update public.wallet_topups set status = 'approved', amount = p_amount, reason = nullif(trim(p_reason), ''), reviewed_at = now() where id = p_id;
+    update public.profiles set wallet_balance = wallet_balance + p_amount where id = t.user_id;
+    insert into public.notifications(user_id, title, body, popup, kind)
+    values (t.user_id, 'Wallet recharged — ' || t.ref, p_amount || ' SAR was added to your wallet.' || coalesce(' ' || nullif(trim(p_reason), ''), ''), true, 'approved');
+  else
+    update public.wallet_topups set status = 'rejected', reason = nullif(trim(p_reason), ''), reviewed_at = now() where id = p_id;
+    insert into public.notifications(user_id, title, body, popup, kind)
+    values (t.user_id, 'Wallet recharge rejected — ' || t.ref, coalesce(nullif(trim(p_reason), ''), 'The STC Sawa PIN could not be used.'), true, 'rejected');
+  end if;
+end $$;
+grant execute on function public.review_topup(uuid, boolean, numeric, text) to authenticated;
+
+-- Admin: per-customer payment methods, bank account, wallet adjustment
+create or replace function public.admin_update_customer(p_user uuid, p_allow_bank boolean, p_allow_wallet boolean, p_bank uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  update public.profiles set allow_bank = p_allow_bank, allow_wallet = p_allow_wallet, bank_account_id = p_bank where id = p_user;
+end $$;
+grant execute on function public.admin_update_customer(uuid, boolean, boolean, uuid) to authenticated;
+
+create or replace function public.admin_adjust_wallet(p_user uuid, p_delta numeric)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  update public.profiles set wallet_balance = greatest(0, wallet_balance + p_delta) where id = p_user;
+end $$;
+grant execute on function public.admin_adjust_wallet(uuid, numeric) to authenticated;
+
+do $$ begin
+  alter publication supabase_realtime add table public.wallet_topups;
+exception when others then null; end $$;
+
+-- =====================================================================
+-- SETUP CHECKLIST (do once in Supabase dashboard)
+-- 1. Authentication → Sign In / Providers → turn ON "Allow anonymous sign-ins"
+--    (customers sign up with their name only).
+-- 2. Authentication → Users → Add user → Create new user:
+--      email: admin@salon.local   password: admin1234   (tick "Auto confirm")
+--    It becomes admin automatically. On the website log in with username "admin".
+--    Change this password before going live.
+-- 3. If you created the admin user BEFORE running this file, run:
+--    insert into public.user_roles (user_id, role)
+--    select id, 'admin' from auth.users where email = 'admin@salon.local' on conflict do nothing;
+-- =====================================================================
