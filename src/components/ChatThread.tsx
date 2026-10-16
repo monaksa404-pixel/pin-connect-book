@@ -63,7 +63,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
     );
   }
   return (
-    <div>
+    <div className="flex min-h-[calc(100dvh-9rem)] flex-col pb-28">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h1 className="font-display text-4xl font-semibold text-rose-950">Live Chat</h1>
@@ -75,7 +75,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         <p className="font-semibold text-rose-950">Beauty House Support</p>
         <p className="text-xs text-emerald-600">Online</p>
       </div>
-      <div ref={box} className="mt-3 max-h-[50vh] space-y-3 overflow-y-auto">
+      <div ref={box} className="mt-3 flex-1 space-y-3 overflow-y-auto">
         {rows.length === 0 && <p className="rounded-2xl bg-white p-4 text-sm text-rose-900/70">Hello! Welcome to The Beauty House Salon. How can we help you today?</p>}
         {rows.map((m) => (
           <div key={m.id} className={cn("flex", m.sender === "user" ? "justify-end" : "justify-start")}>
@@ -86,15 +86,19 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           </div>
         ))}
       </div>
-      <div className="mt-3 flex gap-2 overflow-x-auto">
-        {prompts.map((p) => (
-          <button key={p} type="button" onClick={() => setText(p)} className="shrink-0 rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-rose-600 shadow-sm">{p}</button>
-        ))}
+      <div className="fixed inset-x-0 bottom-16 z-30 border-t border-rose-200 bg-[#ffd6e8] px-3 py-2 md:bottom-0">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-2 flex gap-2 overflow-x-auto">
+            {prompts.map((p) => (
+              <button key={p} type="button" onClick={() => setText(p)} className="shrink-0 rounded-2xl bg-white px-3 py-2 text-xs font-semibold text-rose-600 shadow-sm">{p}</button>
+            ))}
+          </div>
+          <form onSubmit={send} className="flex gap-2">
+            <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="rounded-full bg-white" />
+            <Button type="submit" size="icon" className="shrink-0 rounded-full bg-rose-600" aria-label="Send"><Send className="h-4 w-4" /></Button>
+          </form>
+        </div>
       </div>
-      <form onSubmit={send} className="mt-3 flex gap-2">
-        <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="rounded-full bg-white" />
-        <Button type="submit" size="icon" className="shrink-0 rounded-full bg-rose-600" aria-label="Send"><Send className="h-4 w-4" /></Button>
-      </form>
     </div>
   );
 }

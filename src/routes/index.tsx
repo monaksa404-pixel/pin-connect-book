@@ -22,9 +22,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "The Beauty House Salon" },
-      { name: "description", content: "Book haircuts, beard, facial and massage at The Beauty House." },
+      { name: "description", content: "The Beauty House Salon. Haircuts, Beard Care, Facial and Massage." },
       { property: "og:title", content: "The Beauty House Salon" },
-      { property: "og:image", content: "/images/slider1.jpeg" },
+      { property: "og:description", content: "The Beauty House Salon. Haircuts, Beard Care, Facial and Massage." },
+      { property: "og:image", content: "https://pin-connect-book.vercel.app/images/logo.png" },
+      { property: "og:url", content: "https://pin-connect-book.vercel.app/" },
     ],
   }),
   component: Index,

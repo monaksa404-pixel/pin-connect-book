@@ -47,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   address: "King Fahd Road, Riyadh, Saudi Arabia",
   map_url: "https://maps.google.com/?q=Riyadh",
   logo_url: null,
+  signin_image_url: null,
 };
 
 const demo = (

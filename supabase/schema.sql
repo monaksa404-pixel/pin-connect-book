@@ -706,6 +706,7 @@ end $$;
 grant execute on function public.admin_set_contact(uuid, boolean, text, text, text) to authenticated;
 
 alter table public.settings add column if not exists logo_url text;
+alter table public.settings add column if not exists signin_image_url text;
 
 create table if not exists public.homepage_sliders (
   id uuid primary key default gen_random_uuid(),

@@ -178,11 +178,7 @@ function Checkout() {
         <div><Label htmlFor="no">Notes (optional)</Label><Textarea id="no" value={notes} maxLength={500} placeholder="Any special request..." onChange={(e) => setNotes(e.target.value)} className="mt-1 rounded-2xl" /></div>
       </div>
       <div className="rounded-3xl bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-rose-600">Summary</h2>
-          <Link to="/book" className="rounded-full border border-rose-200 px-3 py-1 text-sm text-rose-600">Edit Date & Time</Link>
-        </div>
-        <p className="mt-2 text-sm text-rose-900/70">{slot.date} at {fmtTime(slot.time)}</p>
+        <h2 className="font-display text-2xl font-semibold text-rose-600">Summary</h2>
         {lines.map((l) => (
           <div key={l.service.id} className="mt-3 flex items-center gap-3">
             <img src={serviceImage(l.service)} alt="" className="h-12 w-12 rounded-xl object-cover" />

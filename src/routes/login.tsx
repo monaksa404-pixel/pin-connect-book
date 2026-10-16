@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase, friendlyError } from "@/lib/supabase";
+import { mediaUrl, settingsQuery } from "@/lib/data";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,8 @@ function LoginPage() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const { data: settings } = useQuery(settingsQuery);
+  const signImage = mediaUrl(settings?.signin_image_url) || "/images/logo.png";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +40,7 @@ function LoginPage() {
   };
 
   return (
-    <AuthCard title="Sign in" sub="Use the same email, name, and mobile number from your account.">
+    <AuthCard title="Sign in" sub="Use the same email, name, and mobile number from your account." image={signImage}>
       <form onSubmit={submit} className="space-y-4">
         <div><Label htmlFor="u" className="text-foreground">Email / Gmail</Label><Input id="u" required autoComplete="email" value={login} onChange={(e) => setLogin(e.target.value)} className="mt-1 h-11" /></div>
         <div><Label htmlFor="pw" className="text-foreground">Password</Label><Input id="pw" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
@@ -53,11 +57,11 @@ function LoginPage() {
   );
 }
 
-export function AuthCard({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
+export function AuthCard({ title, sub, children, image = "/images/logo.png" }: { title: string; sub: string; children: React.ReactNode; image?: string }) {
   return (
-    <div className="px-4 py-16">
-      <div className="mx-auto max-w-md rounded-3xl border border-border bg-card p-8 shadow-soft">
-        <img src="/images/logo.png" alt="The Beauty House" className="mb-4 h-16 w-auto" />
+    <div className="bg-[#ffd6e8] px-4 py-10">
+      <div className="mx-auto max-w-md rounded-3xl border border-rose-100 bg-white p-8 shadow-soft">
+        <img src={image} alt="The Beauty House Salon" className="mb-4 h-16 w-auto" />
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">{sub}</p>
         {children}

@@ -574,17 +574,28 @@ function SettingsTab() {
   const { data } = useQuery(settingsQuery);
   const [s, setS] = useState<Settings | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [signFile, setSignFile] = useState<File | null>(null);
   const cur = s ?? data ?? DEFAULT_SETTINGS;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...cur, [k]: v });
   const save = async () => {
     let logo_url = cur.logo_url;
+    let signin_image_url = cur.signin_image_url;
     if (logoFile) {
       const path = `logo/${Date.now()}-${logoFile.name.replace(/[^a-z0-9.]/gi, "")}`;
       const up = await supabase.storage.from("media").upload(path, logoFile);
       if (up.error) { toast.error(up.error.message); return; }
       logo_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
     }
-    const { error } = await supabase.from("settings").update({ ...cur, logo_url, advance_percent: Number(cur.advance_percent), slot_minutes: Number(cur.slot_minutes), updated_at: new Date().toISOString() }).eq("id", 1);
+    if (signFile) {
+      const path = `signin/${Date.now()}-${signFile.name.replace(/[^a-z0-9.]/gi, "")}`;
+      const up = await supabase.storage.from("media").upload(path, signFile);
+      if (up.error) { toast.error(up.error.message); return; }
+      signin_image_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+    }
+    const payload: Record<string, unknown> = { ...cur, logo_url, advance_percent: Number(cur.advance_percent), slot_minutes: Number(cur.slot_minutes), updated_at: new Date().toISOString() };
+    if (signin_image_url) payload.signin_image_url = signin_image_url;
+    else delete payload.signin_image_url;
+    const { error } = await supabase.from("settings").update(payload).eq("id", 1);
     if (error) { toast.error(error.message); return; }
     toast.success("Settings saved");
     setS(null);
@@ -621,6 +632,11 @@ function SettingsTab() {
             <img src={logoFile ? URL.createObjectURL(logoFile) : (cur.logo_url || "/images/logo.png")} alt="" className="mt-2 h-16 w-auto" />
             <Input className="mt-2" type="file" accept="image/*" onChange={(e) => { setLogoFile(e.target.files?.[0] ?? null); setS({ ...cur }); }} />
           </div>
+          <div className="sm:col-span-2">
+            <Label>Sign-in page image</Label>
+            <img src={signFile ? URL.createObjectURL(signFile) : (cur.signin_image_url || "/images/logo.png")} alt="" className="mt-2 h-20 w-auto" />
+            <Input className="mt-2" type="file" accept="image/*" onChange={(e) => { setSignFile(e.target.files?.[0] ?? null); setS({ ...cur }); }} />
+          </div>
         </div>
       </section>
       <Button className="lg:col-span-2" onClick={save} disabled={!s}>Save settings</Button>
@@ -644,9 +660,9 @@ function SlidersTab() {
   const { data: rows = [] } = useQuery({
     queryKey: ["admin-sliders"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("homepage_sliders").select("*").order("sort");
-      if (error) throw error;
-      return data as { id: string; image_url: string; service_id: string | null; title: string | null; active: boolean }[];
+      const { data, error } = await supabase.from("homepage_sliders").select("id, image_url, service_id, title, active, sort").order("sort");
+      if (error) { toast.error(error.message); return [] as { id: string; image_url: string; service_id: string | null; title: string | null; active: boolean }[]; }
+      return (data ?? []) as { id: string; image_url: string; service_id: string | null; title: string | null; active: boolean }[];
     },
   });
   const add = async () => {
@@ -678,11 +694,13 @@ function SlidersTab() {
           {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <Input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        {file && <img src={URL.createObjectURL(file)} alt="" className="h-24 w-full rounded-xl object-cover" />}
         <Button className="rounded-full" onClick={add}>Add slider</Button>
       </div>
+      {rows.length === 0 && <p className="text-sm text-rose-900/70">No uploaded sliders yet. The homepage still shows the four default salon banners until you add one.</p>}
       {rows.map((r) => (
         <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-rose-100 bg-white p-3">
-          <img src={mediaUrl(r.image_url)} alt="" className="h-16 w-28 rounded-xl object-cover" />
+          <img src={mediaUrl(r.image_url) || r.image_url} alt={r.title || "Slider"} className="h-16 w-28 rounded-xl bg-rose-50 object-cover" />
           <div className="flex-1 text-sm"><p className="font-semibold">{r.title || "Slider"}</p><p className="text-muted-foreground">{services.find((s) => s.id === r.service_id)?.name || "No service link"}</p></div>
           <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove(r.id)}>Remove</Button>
         </div>

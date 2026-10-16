@@ -86,14 +86,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "The Beauty House Salon" },
-      { name: "description", content: "Book haircuts, beard, facial and massage services online." },
+      { name: "description", content: "The Beauty House Salon — haircuts, beard care, facial and massage." },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pin-connect-book.vercel.app/" },
       { property: "og:site_name", content: "The Beauty House Salon" },
       { property: "og:title", content: "The Beauty House Salon" },
-      { property: "og:description", content: "Book haircuts, beard, facial and massage at The Beauty House Salon." },
-      { property: "og:image", content: "/images/logo.png" },
+      { property: "og:description", content: "The Beauty House Salon. Haircuts, Beard Care, Facial and Massage." },
+      { property: "og:image", content: "https://pin-connect-book.vercel.app/images/logo.png" },
+      { property: "og:image:secure_url", content: "https://pin-connect-book.vercel.app/images/logo.png" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "/images/logo.png" },
+      { name: "twitter:title", content: "The Beauty House Salon" },
+      { name: "twitter:image", content: "https://pin-connect-book.vercel.app/images/logo.png" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -140,7 +143,7 @@ function RootComponent() {
             </div>
           )}
           {!isAdmin && <SiteHeader />}
-          <main className="min-h-[60vh]">
+          <main className="min-h-[60vh] bg-[#fff0f6]">
             <Outlet />
           </main>
           {!isAdmin && <SiteFooter />}

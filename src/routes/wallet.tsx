@@ -9,7 +9,7 @@ import { sendAlert } from "@/lib/alerts";
 import { sar } from "@/lib/data";
 import type { Topup } from "@/lib/types";
 import { RequireAuth } from "@/components/shared";
-import { ArrowDownLeft, Plus, Receipt, Wallet as WalletIcon } from "lucide-react";
+import { ArrowDownLeft, Plus, Receipt, ShoppingCart, Wallet as WalletIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ function WalletPage() {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [wd, setWd] = useState({ amount: "", account_name: "", account_number: "", iban: "" });
-  const [panel, setPanel] = useState<"add" | "history" | "withdraw" | null>("add");
+  const [panel, setPanel] = useState<"add" | "withdraw" | null>(null);
   const { data: rows = [] } = useQuery({
     queryKey: ["my-topups", user?.id],
     enabled: !!user && isSupabaseConfigured,
@@ -42,6 +42,29 @@ function WalletPage() {
       return data as Topup[];
     },
   });
+  const { data: withdrawals = [] } = useQuery({
+    queryKey: ["my-withdrawals", user?.id],
+    enabled: !!user && isSupabaseConfigured,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("wallet_withdrawals").select("id, amount, status, created_at").order("created_at", { ascending: false });
+      if (error) return [] as { id: string; amount: number; status: string; created_at: string }[];
+      return data as { id: string; amount: number; status: string; created_at: string }[];
+    },
+  });
+  const { data: pays = [] } = useQuery({
+    queryKey: ["my-wallet-pays", user?.id],
+    enabled: !!user && isSupabaseConfigured,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("bookings").select("id, items, advance_amount, payment_method, payment_status, created_at").eq("payment_method", "wallet");
+      if (error) return [] as { id: string; items: { name: string }[]; advance_amount: number; payment_status: string; created_at: string }[];
+      return (data ?? []) as { id: string; items: { name: string }[]; advance_amount: number; payment_status: string; created_at: string }[];
+    },
+  });
+  const history = [
+    ...rows.map((t) => ({ id: t.id, kind: "deposit" as const, title: "Added Money", amount: t.amount, status: t.status === "approved" ? "Success" : t.status, at: t.created_at, reason: t.reason })),
+    ...withdrawals.map((w) => ({ id: w.id, kind: "withdraw" as const, title: "Withdrawal", amount: w.amount, status: w.status, at: w.created_at, reason: null as string | null })),
+    ...pays.map((p) => ({ id: p.id, kind: "pay" as const, title: `Payment for ${p.items?.[0]?.name ?? "booking"}`, amount: Number(p.advance_amount), status: p.payment_status === "verified" ? "Completed" : p.payment_status, at: p.created_at, reason: null as string | null })),
+  ].sort((a, b) => +new Date(b.at) - +new Date(a.at));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,14 +105,22 @@ function WalletPage() {
   const balance = Number(profile?.wallet_balance ?? 0);
 
   return (
-    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
       <div className="mx-auto max-w-3xl">
-        <h1 className="font-display text-4xl font-semibold text-rose-950">Wallet</h1>
-        <p className="text-rose-900/60">Manage your balance and payments</p>
-        <div className="mt-4 rounded-3xl bg-gradient-to-br from-rose-500 to-rose-600 p-5 text-white shadow-sm">
+        <h1 className="font-display text-4xl font-semibold text-[#5c2344]">Wallet</h1>
+        <p className="text-[#9a5b78]">Manage your balance and payments</p>
+        <div className="relative mt-4 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#ff7ab3] via-[#ff4d94] to-[#f43f8b] p-5 text-white shadow-sm">
           <p className="flex items-center gap-2 text-sm"><WalletIcon className="h-4 w-4" /> Current Balance</p>
           <p className="mt-2 font-display text-4xl font-semibold">{balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SAR</p>
-          <p className="mt-2 max-w-xs text-sm text-white/90">Use your wallet for easy and fast booking at The Beauty House Salon.</p>
+          <p className="mt-2 max-w-[14rem] text-sm text-white/90">Use your wallet for easy and fast booking at The Beauty House Salon.</p>
+          <div className="pointer-events-none absolute -right-2 bottom-0 top-2 w-36">
+            <div className="absolute right-6 top-6 h-10 w-10 rounded-full bg-[#ffd36a]" />
+            <div className="absolute right-2 top-12 h-8 w-8 rounded-full bg-[#ffc14d]" />
+            <div className="absolute right-4 top-8 h-16 w-24 rotate-[-8deg] rounded-2xl bg-[#ff8cbc] shadow-lg">
+              <div className="mx-auto mt-2 h-3 w-10 rounded-full bg-[#ffe4f2]" />
+              <div className="mx-auto mt-2 h-6 w-6 rounded-full bg-[#fff0f6]" />
+            </div>
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3">
           {([
@@ -97,8 +128,8 @@ function WalletPage() {
             ["history", Receipt, "Transaction History"],
             ["withdraw", ArrowDownLeft, "Withdraw"],
           ] as const).map(([id, Icon, label]) => (
-            <button key={id} type="button" onClick={() => setPanel(panel === id ? null : id)} className="rounded-3xl bg-white py-4 text-center text-xs font-semibold text-rose-950 shadow-sm">
-              <span className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full bg-rose-50 text-rose-600"><Icon className="h-5 w-5" /></span>
+            <button key={id} type="button" onClick={() => setPanel(id === "history" ? null : panel === id ? null : id)} className="rounded-3xl bg-white py-4 text-center text-xs font-semibold text-[#5c2344] shadow-sm">
+              <span className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full bg-[#ffe4f2] text-[#ff4d94]"><Icon className="h-5 w-5" /></span>
               {label}
             </button>
           ))}
@@ -120,7 +151,7 @@ function WalletPage() {
               <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 rounded-2xl" />
             </div>
             <p className="rounded-2xl bg-rose-50 p-3 text-sm text-rose-700">The amount is added after the salon verifies your STC Sawa PIN.</p>
-            <Button disabled={busy} className="h-12 w-full rounded-full bg-rose-600">{busy ? "Sending…" : "Add Money in Wallet →"}</Button>
+            <Button disabled={busy} className="h-12 w-full rounded-full bg-[#ff4d94]">{busy ? "Sending…" : "Add Money in Wallet →"}</Button>
           </form>
         )}
         {panel === "withdraw" && (
@@ -131,26 +162,25 @@ function WalletPage() {
               <div><Label>Account number</Label><Input value={wd.account_number} onChange={(e) => setWd({ ...wd, account_number: e.target.value })} className="mt-1" /></div>
               <div><Label>IBAN</Label><Input value={wd.iban} onChange={(e) => setWd({ ...wd, iban: e.target.value })} className="mt-1" /></div>
             </div>
-            <Button className="rounded-full bg-rose-600">Request withdrawal</Button>
+            <Button className="rounded-full bg-[#ff4d94]">Request withdrawal</Button>
           </form>
         )}
         <div className="mt-6 flex items-end justify-between">
-          <h2 className="font-display text-2xl font-semibold text-rose-950">Recent Transactions</h2>
-          <button type="button" onClick={() => setPanel("history")} className="text-sm font-semibold text-rose-600">View All &gt;</button>
+          <h2 className="font-display text-2xl font-semibold text-[#5c2344]">Recent Transactions</h2>
         </div>
         <div className="mt-3 space-y-2 rounded-3xl bg-white p-3 shadow-sm">
-          {rows.length === 0 && <p className="p-4 text-sm text-rose-900/60">No transactions yet.</p>}
-          {rows.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 border-b border-rose-50 py-3 last:border-0">
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-rose-50 text-rose-600"><Plus className="h-4 w-4" /></span>
+          {history.length === 0 && <p className="p-4 text-sm text-[#9a5b78]">No transactions yet.</p>}
+          {history.map((t) => (
+            <div key={t.id} className="flex items-center gap-3 border-b border-pink-50 py-3 last:border-0">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-[#ffe4f2] text-[#ff4d94]">{t.kind === "pay" ? <ShoppingCart className="h-4 w-4" /> : t.kind === "deposit" ? <Plus className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}</span>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-rose-950">Added Money</p>
-                <p className="text-xs text-rose-900/50">{new Date(t.created_at).toLocaleString()}</p>
-                {t.reason && <p className="text-xs text-rose-700">{t.reason}</p>}
+                <p className="font-semibold text-[#3d2030]">{t.title}</p>
+                <p className="text-xs text-[#9a5b78]">{new Date(t.at).toLocaleString()}</p>
+                {t.reason && <p className="text-xs text-[#e23b86]">{t.reason}</p>}
               </div>
               <div className="text-right">
-                <p className="font-semibold text-emerald-600">+ {sar(t.amount)}</p>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">{t.status === "approved" ? "Success" : t.status}</span>
+                <p className={`font-semibold ${t.kind === "deposit" ? "text-emerald-600" : "text-[#e23b86]"}`}>{t.kind === "deposit" ? "+" : "−"} {sar(t.amount)}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] ${t.kind === "deposit" ? "bg-emerald-50 text-emerald-700" : "bg-[#ffe4f2] text-[#e23b86]"}`}>{t.status}</span>
               </div>
             </div>
           ))}

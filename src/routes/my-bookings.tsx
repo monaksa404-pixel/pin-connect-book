@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye } from "lucide-react";
+import { CalendarDays, Clock, Eye, MapPin } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { supabase, friendlyError, isSupabaseConfigured } from "@/lib/supabase";
@@ -86,14 +86,13 @@ function MyBookings() {
   });
   return (
     <>
-      <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
+      <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
         <div className="mx-auto max-w-3xl">
-          <p className="text-xs font-semibold tracking-widest text-rose-400">ACCOUNT</p>
-          <h1 className="font-display text-4xl font-semibold text-rose-950">My <span className="text-rose-600">Bookings</span></h1>
-          <p className="text-rose-900/60">View and manage your appointments.</p>
+          <h1 className="font-display text-4xl font-semibold text-[#5c2344]">My Booking</h1>
+          <p className="text-[#9a5b78]">View and manage your appointments</p>
           <div className="mt-4 flex gap-2 overflow-x-auto">
             {(["all", "upcoming", "completed", "cancelled"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold capitalize ${tab === t ? "bg-rose-600 text-white" : "bg-white text-rose-900/70"}`}>
+              <button key={t} type="button" onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold capitalize ${tab === t ? "bg-[#ff4d94] text-white" : "bg-white text-[#9a5b78]"}`}>
                 {t === "all" ? "All Bookings" : t}
               </button>
             ))}
@@ -104,40 +103,31 @@ function MyBookings() {
             {shown.map((b) => {
               const pic = services.find((s) => s.id === b.items[0]?.service_id);
               const when = b.booking_date ? format(parseISO(b.booking_date), "EEE, dd MMM yyyy") : "";
+              const chip = b.status === "completed" ? "bg-emerald-100 text-emerald-700" : b.status === "cancelled" ? "bg-pink-100 text-[#e23b86]" : "bg-[#ffe4f2] text-[#e23b86]";
+              const chipLabel = b.status === "pending" || b.status === "confirmed" ? "Upcoming" : b.status;
               return (
                 <article key={b.id} className="rounded-3xl bg-white p-3 shadow-sm">
                   <div className="flex gap-3">
-                    <img src={pic ? serviceImage(pic) : "/images/slider1.jpeg"} alt="" className="h-16 w-16 rounded-2xl object-cover" />
+                    <img src={pic ? serviceImage(pic) : "/images/slider1.jpeg"} alt="" className="h-20 w-20 rounded-2xl object-cover" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-xs text-rose-900/50">{b.code}</p>
-                          <p className="text-xs text-rose-900/70">{when} · {fmtTime(String(b.booking_time).slice(0, 5))}</p>
-                          <p className="font-semibold text-rose-950">{b.items.map((i) => i.name).join(", ")}</p>
-                          <p className="text-xs text-rose-900/60">{b.items[0]?.qty ? "" : ""}{pic?.duration_min ?? ""}{pic ? " min" : ""}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${b.status === "confirmed" ? "bg-emerald-100 text-emerald-700" : b.status === "completed" ? "bg-sky-100 text-sky-700" : b.status === "cancelled" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{b.status}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${b.payment_status === "verified" ? "bg-emerald-100 text-emerald-700" : b.payment_status === "rejected" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{b.payment_status}</span>
-                        </div>
+                        <p className="font-semibold text-[#3d2030]">{b.items.map((i) => i.name).join(", ")}</p>
+                        <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold capitalize ${chip}`}>{chipLabel}</span>
                       </div>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-[#9a5b78]"><CalendarDays className="h-3.5 w-3.5 text-[#ff4d94]" />{when}</p>
+                      <p className="flex items-center gap-1 text-xs text-[#9a5b78]"><Clock className="h-3.5 w-3.5 text-[#ff4d94]" />{fmtTime(String(b.booking_time).slice(0, 5))}</p>
+                      <p className="flex items-center gap-1 text-xs text-[#9a5b78]"><MapPin className="h-3.5 w-3.5 text-[#ff4d94]" />{settings.salon_name}</p>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-3 rounded-2xl bg-rose-50 py-2 text-center text-xs">
-                    <div><p className="text-rose-900/50">Total</p><p className="font-semibold">{sar(b.total)}</p></div>
-                    <div><p className="text-rose-900/50">Advance</p><p className="font-semibold">{sar(b.advance_amount)}</p></div>
-                    <div><p className="text-rose-900/50">At salon</p><p className="font-semibold">{sar(b.remaining_amount)}</p></div>
-                  </div>
                   <div className="mt-3 flex justify-end gap-2">
-                    {(b.status === "pending" || b.status === "confirmed") && <Button asChild size="sm" variant="outline" className="rounded-full border-rose-200 text-rose-700"><Link to="/book">Reschedule</Link></Button>}
-                    {(b.status === "completed" || b.status === "cancelled") && <Button asChild size="sm" variant="outline" className="rounded-full border-rose-200 text-rose-700"><Link to="/services">Book Again</Link></Button>}
-                    <Button size="sm" className="rounded-full bg-rose-600" onClick={() => setOpenId(openId === b.id ? null : b.id)}><Eye className="mr-1 h-4 w-4" />View Details</Button>
+                    {(b.status === "completed" || b.status === "cancelled") && <Button asChild size="sm" variant="outline" className="rounded-full border-pink-200 text-[#e23b86]"><Link to="/services">Book Again</Link></Button>}
+                    <Button size="sm" className="rounded-full bg-[#ff4d94]" onClick={() => setOpenId(openId === b.id ? null : b.id)}><Eye className="mr-1 h-4 w-4" />View Details</Button>
                   </div>
                   {openId === b.id && (
-                    <div className="mt-3 space-y-2 rounded-2xl bg-rose-50 p-3 text-sm">
+                    <div className="mt-3 space-y-2 rounded-2xl bg-[#fff0f6] p-3 text-sm">
                       <p>Total {sar(b.total)} · Advance {sar(b.advance_amount)} · Remaining {b.extra_payment_status === "verified" ? sar(0) : sar(b.remaining_amount)}</p>
                       <p>Payment: {b.payment_status}</p>
-                      {b.payment_status === "rejected" && <Button size="sm" className="rounded-full bg-rose-600" onClick={() => setPay({ booking: b, kind: "resubmit" })}>Pay again</Button>}
+                      {b.payment_status === "rejected" && <Button className="h-11 w-full rounded-full bg-[#ff4d94]" onClick={() => setPay({ booking: b, kind: "resubmit" })}>Pay again</Button>}
                       {b.extra_enabled && ["awaiting", "rejected"].includes(b.extra_payment_status) && (
                         <Button size="sm" variant="outline" className="rounded-full" onClick={() => setPay({ booking: b, kind: "extra" })}>Pay remaining {sar(b.extra_amount)}</Button>
                       )}

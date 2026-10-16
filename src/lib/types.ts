@@ -32,6 +32,7 @@ export type Settings = {
   address: string | null;
   map_url: string | null;
   logo_url: string | null;
+  signin_image_url: string | null;
 };
 
 export type BookingItem = { service_id: string; name: string; price: number; qty: number };
