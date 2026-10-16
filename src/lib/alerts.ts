@@ -6,7 +6,7 @@ export async function sendAlert(event: string, message: string) {
   let status = "failed";
   try {
     const r = await notifyTelegram({ data: { message } });
-    status = r.status;
+    status = r?.status || "failed";
   } catch (e) {
     console.error(e);
   }
@@ -17,4 +17,5 @@ export async function sendAlert(event: string, message: string) {
       console.error(e);
     }
   }
+  return status;
 }

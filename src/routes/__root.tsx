@@ -94,8 +94,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "The Beauty House Salon. Haircuts, Beard Care, Facial and Massage." },
       { property: "og:image", content: "https://pin-connect-book.vercel.app/images/sender.jpeg" },
       { property: "og:image:secure_url", content: "https://pin-connect-book.vercel.app/images/sender.jpeg" },
+      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:width", content: "1600" },
+      { property: "og:image:height", content: "900" },
+      { property: "og:image:alt", content: "The Beauty House Salon" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "The Beauty House Salon" },
+      { name: "twitter:description", content: "The Beauty House Salon. Haircuts, Beard Care, Facial and Massage." },
       { name: "twitter:image", content: "https://pin-connect-book.vercel.app/images/sender.jpeg" },
     ],
     links: [
