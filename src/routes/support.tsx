@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { PageHeader, RequireAuth } from "@/components/shared";
+import { RequireAuth } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
 
 export const Route = createFileRoute("/support")({
@@ -18,8 +18,7 @@ export const Route = createFileRoute("/support")({
 function SupportPage() {
   return (
     <>
-      <PageHeader eyebrow="Help" title="Support">Message our team — we usually reply within minutes.</PageHeader>
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <div className="mx-auto min-h-screen max-w-3xl bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
         <RequireAuth what="chat with us"><Chat /></RequireAuth>
       </div>
     </>

@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart";
 const ITEMS = [
   { to: "/", label: "Home", icon: Home },
   { to: "/services", label: "Services", icon: LayoutGrid },
-  { to: "/my-bookings", label: "My Booking", icon: CalendarDays },
+  { to: "/my-bookings", label: "My Bookings", icon: CalendarDays },
   { to: "/wallet", label: "Wallet", icon: Wallet },
   { to: "/cart", label: "Cart", icon: ShoppingCart },
   { to: "/support", label: "Live Chat", icon: MessageCircle },

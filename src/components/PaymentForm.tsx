@@ -26,20 +26,22 @@ export function PaymentForm({
   userId,
   submitLabel = "Submit payment",
   onSubmit,
+  only,
 }: {
   settings: Settings;
   amount: number;
   userId: string;
   submitLabel?: string;
   onSubmit: (r: PaymentResult) => Promise<void>;
+  only?: "bank" | "wallet";
 }) {
   const { data: profile } = useProfile();
   const { data: bank } = useAssignedBank(profile?.bank_account_id);
   const bankOn = settings.bank_enabled && (profile?.allow_bank ?? true) && !!bank;
   const walletOn = settings.stc_enabled && (profile?.allow_wallet ?? true);
   const balance = Number(profile?.wallet_balance ?? 0);
-  const [pick, setPick] = useState<"bank" | "wallet" | null>(null);
-  const method = pick ?? (bankOn ? "bank" : walletOn ? "wallet" : null);
+  const [pick, setPick] = useState<"bank" | "wallet" | null>(only ?? null);
+  const method = only ?? pick ?? (bankOn ? "bank" : walletOn ? "wallet" : null);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -92,15 +94,18 @@ export function PaymentForm({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl bg-rose p-5 text-primary-foreground">
-        <p className="text-xs uppercase tracking-widest opacity-80">Amount to pay now</p>
-        <p className="font-display text-4xl font-semibold">{sar(amount)}</p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        {bankOn && <Option id="bank" icon={Building2} title="Bank transfer" sub="Upload a screenshot" />}
-        {walletOn && <Option id="wallet" icon={Wallet} title="Wallet balance" sub={`Available ${sar(balance)}`} />}
-      </div>
+      {!only && (
+        <>
+          <div className="rounded-2xl bg-rose p-5 text-primary-foreground">
+            <p className="text-xs uppercase tracking-widest opacity-80">Amount to pay now</p>
+            <p className="font-display text-4xl font-semibold">{sar(amount)}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {bankOn && <Option id="bank" icon={Building2} title="Bank transfer" sub="Upload a screenshot" />}
+            {walletOn && <Option id="wallet" icon={Wallet} title="Wallet balance" sub={`Available ${sar(balance)}`} />}
+          </div>
+        </>
+      )}
 
       {method === "bank" && bank && (
         <div className="space-y-4 rounded-2xl border border-border bg-card p-5">

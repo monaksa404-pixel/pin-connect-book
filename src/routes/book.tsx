@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { format, startOfToday } from "date-fns";
 import { useCart } from "@/lib/cart";
 import { DEFAULT_SETTINGS, fmtTime, settingsQuery, timeSlots } from "@/lib/data";
-import { EmptyState, PageHeader, Steps } from "@/components/shared";
+import { EmptyState } from "@/components/shared";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { FullNotice } from "@/components/FullNotice";
@@ -57,40 +57,30 @@ function BookPage() {
   };
 
   return (
-    <>
-      <PageHeader eyebrow="Step 3" title="Date & time" />
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <Steps current={2} />
-        <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
-        <div className="grid gap-6 md:grid-cols-[auto_1fr]">
-          <div className="rounded-3xl border border-border bg-card p-3 shadow-soft">
+    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+      <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
+      <div className="mx-auto max-w-4xl rounded-[28px] bg-white p-4 shadow-sm md:p-6">
+        <h1 className="font-display text-3xl font-semibold text-rose-950">Choose <span className="text-rose-600">Date & Time</span></h1>
+        <p className="text-sm text-rose-900/60">Select your preferred date and available time slot.</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl border border-rose-100 p-3">
+            <p className="mb-2 font-semibold text-rose-950">Select Date</p>
             <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={{ before: startOfToday() }} />
+            <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">Today: {format(new Date(), "EEE, d MMM yyyy")}</p>
           </div>
-          <div className="rounded-3xl border border-border bg-card p-5 shadow-soft">
-            <p className="font-semibold">{date ? format(date, "EEEE, d MMMM") : "Select a date"}</p>
-            {date && (
-              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {slots.length === 0 && <p className="col-span-full text-sm text-muted-foreground">No times left today. Please pick another date.</p>}
-                {slots.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTime(t)}
-                    className={cn(
-                      "rounded-xl border py-2 text-sm font-medium transition",
-                      time === t ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary/50",
-                    )}
-                  >
-                    {fmtTime(t)}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="rounded-3xl border border-rose-100 p-3">
+            <p className="font-semibold text-rose-950">Select Time</p>
+            <p className="text-xs text-rose-900/60">{date ? `Available time slots for ${format(date, "EEE, d MMM yyyy")}` : "Pick a date first"}</p>
+            <div className="mt-3 grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
+              {slots.map((t) => (
+                <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700")}>{fmtTime(t)}</button>
+              ))}
+              {date && slots.length === 0 && <p className="col-span-2 text-sm text-rose-900/60">No times left today.</p>}
+            </div>
           </div>
         </div>
-        <div className="mt-6 flex justify-end">
-          <Button disabled={!date || !time} onClick={next} className="h-12 rounded-full px-8">Continue</Button>
-        </div>
+        <Button disabled={!date || !time} onClick={next} className="mt-4 h-12 w-full rounded-full bg-rose-600 text-base">Confirm Date & Time →</Button>
       </div>
-    </>
+    </div>
   );
 }
