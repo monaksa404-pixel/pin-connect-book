@@ -126,34 +126,68 @@ function Checkout() {
     </div>
   );
 
+  const orderSummary = (
+    <div className="rounded-3xl bg-white p-4 shadow-sm">
+      <h2 className="font-display text-2xl font-semibold text-[#3d2030]">Order <span className="text-[#ff4d94]">Summary</span></h2>
+      {lines.map((l) => (
+        <div key={l.service.id} className="mt-3 flex items-center gap-3">
+          <img src={serviceImage(l.service)} alt="" className="h-12 w-12 rounded-xl object-cover" />
+          <div className="flex-1"><p>{l.service.name} × {l.qty}</p><p className="text-xs text-[#9a5b78]">{l.service.duration_min} min</p></div>
+          <p className="font-semibold">{sar(l.service.price * l.qty)}</p>
+        </div>
+      ))}
+      <div className="mt-3 space-y-2 border-t border-pink-50 pt-3 text-sm">
+        <div className="flex justify-between"><span>Total Amount</span><strong>{sar(total)}</strong></div>
+        <div className="flex justify-between"><span>Pay Now ({settings.advance_percent}%)</span><strong>{sar(advance)}</strong></div>
+        <div className="flex justify-between"><span>Pay at salon (cash)</span><strong>{sar(remaining)}</strong></div>
+      </div>
+    </div>
+  );
+
   if (view === "card" || view === "otp") {
-    return shell(view === "card" ? "Payment" : "Enter OTP", 4, (
-      <div className="mt-4 space-y-4">
+    return shell("", 3, (
+      <div className="space-y-4">
         <div className="rounded-3xl bg-white p-4 shadow-sm">
           {view === "card" ? (
             <>
-              <h2 className="text-xl font-semibold">Pay with <span className="text-rose-600">Credit/Debit Card</span></h2>
-              <p className="text-sm text-rose-900/60">This salon does not charge cards here. Use bank transfer or wallet for the advance.</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-[#3d2030]">Pay with <span className="text-[#ff4d94]">Credit/Debit Card</span></h2>
+                  <p className="text-sm text-[#9a5b78]">Enter your card details to complete the payment securely.</p>
+                </div>
+                <p className="text-xs font-semibold text-[#ff4d94]">Secure Payment</p>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl bg-[#fff0f6] px-3 py-2 text-xs font-bold">
+                <span className="text-[#1a1f71]">VISA</span>
+                <span className="text-[#eb001b]">●●</span>
+                <span className="text-[#00a651]">mada</span>
+                <span className="text-[#2e77bc]">AMERICAN EXPRESS</span>
+              </div>
               <div className="mt-4 grid gap-3">
-                <Input placeholder="Name on card" autoComplete="off" className="rounded-2xl" />
-                <Input placeholder="Card number" inputMode="numeric" autoComplete="off" maxLength={19} className="rounded-2xl" />
+                <div><Label>Cardholder Name</Label><Input placeholder="Name on card" autoComplete="off" className="mt-1 rounded-2xl" /></div>
+                <div><Label>Card Number</Label><Input placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="off" maxLength={19} className="mt-1 rounded-2xl" /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Input placeholder="MM / YY" autoComplete="off" maxLength={7} className="rounded-2xl" />
-                  <Input placeholder="CVV" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="rounded-2xl" />
+                  <div><Label>Expiry Date</Label><Input placeholder="MM / YY" autoComplete="off" maxLength={7} className="mt-1 rounded-2xl" /></div>
+                  <div><Label>CVV</Label><Input placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 rounded-2xl" /></div>
                 </div>
               </div>
-              <button type="button" onClick={() => setView("otp")} className="mt-4 h-12 w-full rounded-full bg-rose-600 font-semibold text-white">Continue</button>
+              <p className="mt-3 text-xs text-[#9a5b78]">Card details stay on this screen. They are not saved.</p>
+              <button type="button" onClick={() => setView("otp")} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white">Continue</button>
             </>
           ) : (
             <>
-              <h2 className="text-xl font-semibold">Enter <span className="text-rose-600">OTP</span></h2>
-              <p className="text-sm text-rose-900/60">Card payment is not connected, so no code is sent and nothing is saved.</p>
+              <h2 className="text-xl font-semibold text-[#3d2030]">Enter <span className="text-[#ff4d94]">OTP</span></h2>
+              <p className="text-sm text-[#9a5b78]">No code is sent. Card payment is not connected, and nothing is saved.</p>
               <Input placeholder="Enter OTP" inputMode="numeric" autoComplete="off" maxLength={6} className="mt-4 rounded-2xl" />
-              <button type="button" onClick={() => { toast.message("Use bank transfer or wallet to pay the advance."); setView("details"); setMethod("bank"); }} className="mt-4 h-12 w-full rounded-full bg-rose-600 font-semibold text-white">Verify & Pay</button>
+              <p className="mt-2 text-xs text-[#9a5b78]">OTP is valid for 2 minutes</p>
+              <button type="button" onClick={() => toast.message("Use bank transfer or wallet to pay the advance.")} className="mt-3 w-full rounded-full bg-[#ffe4f2] py-3 text-sm font-semibold text-[#ff4d94]">Resend OTP</button>
+              <button type="button" onClick={() => { toast.message("Use bank transfer or wallet to pay the advance."); setView("details"); setMethod("bank"); }} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white">Verify & Pay</button>
             </>
           )}
-          <button type="button" onClick={() => setView("details")} className="mt-3 w-full text-sm font-semibold text-rose-600">Back to payment methods</button>
+          <button type="button" onClick={() => setView(view === "otp" ? "card" : "details")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
         </div>
+        {orderSummary}
+        {view === "otp" && <p className="rounded-2xl bg-[#ffe4f2] p-3 text-center text-sm text-[#e23b86]">Your payment is secured with SSL encryption. We never store your card details.</p>}
       </div>
     ));
   }

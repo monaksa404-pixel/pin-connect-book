@@ -136,21 +136,32 @@ function WalletPage() {
         </div>
         {panel === "add" && (
           <form onSubmit={submit} className="mt-4 space-y-3">
-            <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Select <span className="text-rose-600">Payment Method</span></h2>
-              <div className="mt-3 flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 p-3">
-                <div><p className="font-semibold text-rose-950">STC Sawa PIN</p><p className="text-xs text-rose-900/60">Use an STC Sawa recharge card to add money to your wallet.</p></div>
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-rose-600 text-xs text-white">✓</span>
+            <div className="flex items-start gap-3">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#ff4d94] text-white"><Plus className="h-5 w-5" /></span>
+              <div>
+                <h2 className="font-display text-3xl font-semibold text-[#3d2030]">Add <span className="text-[#ff4d94]">Money</span></h2>
+                <p className="text-sm text-[#9a5b78]">Add balance to your wallet and enjoy faster bookings at The Beauty House Salon.</p>
               </div>
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Enter <span className="text-rose-600">STC Sawa PIN</span></h2>
+              <h2 className="text-lg font-semibold">Select <span className="text-[#ff4d94]">Payment Method</span></h2>
+              <div className="mt-3 flex items-center justify-between rounded-2xl border border-pink-200 bg-[#fff0f6] p-3">
+                <div>
+                  <p className="text-lg font-black leading-none text-[#4b1d8a]">stc</p>
+                  <p className="text-lg font-black leading-none text-[#6d28d9]">sawa</p>
+                </div>
+                <div className="flex-1 px-3"><p className="font-semibold text-[#3d2030]">STC Sawa PIN</p><p className="text-xs text-[#9a5b78]">Use STC Sawa recharge card to add money to your wallet.</p></div>
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-[#ff4d94] text-xs text-white">✓</span>
+              </div>
+            </div>
+            <div className="rounded-3xl bg-white p-4 shadow-sm">
+              <h2 className="text-lg font-semibold">Enter <span className="text-[#ff4d94]">STC Sawa PIN</span></h2>
               <Input inputMode="numeric" maxLength={14} placeholder="Enter STC Sawa PIN" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 14))} className="mt-3 rounded-2xl font-mono" />
-              <p className="mt-2 text-center text-xs text-rose-900/50">Please enter the 14-digit STC Sawa recharge PIN number.</p>
+              <p className="mt-2 text-center text-xs text-[#9a5b78]">Please enter the 14-digit STC Sawa recharge PIN number.</p>
               <Label className="mt-3 block">Amount (SAR)</Label>
               <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1 rounded-2xl" />
             </div>
-            <p className="rounded-2xl bg-rose-50 p-3 text-sm text-rose-700">The amount is added after the salon verifies your STC Sawa PIN.</p>
+            <p className="rounded-2xl bg-[#ffe4f2] p-3 text-sm text-[#e23b86]">The amount is added after the salon verifies your STC Sawa PIN.</p>
             <Button disabled={busy} className="h-12 w-full rounded-full bg-[#ff4d94]">{busy ? "Sending…" : "Add Money in Wallet →"}</Button>
           </form>
         )}
