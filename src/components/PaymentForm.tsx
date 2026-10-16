@@ -7,7 +7,6 @@ import { mediaUrl, sar } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { useAssignedBank, useProfile } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 export type PaymentResult = { method: "bank" | "wallet"; screenshotPath: string | null };
@@ -108,37 +107,51 @@ export function PaymentForm({
       )}
 
       {method === "bank" && bank && (
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
-          {[
-            ["Account name", bank.account_name],
-            ["Bank", bank.bank_name],
-            ["Account holder", bank.account_holder],
-            ["Account number", bank.account_number],
-            ["IBAN", bank.iban],
-          ]
-            .filter(([, v]) => v)
-            .map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">{k}</p>
-                  <p className="truncate font-mono text-sm font-semibold">{v}</p>
-                </div>
-                <Button type="button" variant="ghost" size="icon" onClick={() => copy(v)} aria-label={`Copy ${k}`}>
-                  <Copy className="h-4 w-4" />
-                </Button>
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-pink-100 bg-white p-4">
+            <p className="font-semibold text-[#ff4d94]">Bank Account Details</p>
+            <p className="text-sm text-[#9a5b78]">Transfer {sar(amount)} to the following account.</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-[1fr_160px]">
+              <div className="space-y-3">
+                {[
+                  ["Bank Name", bank.bank_name],
+                  ["Account Name", bank.account_name || bank.account_holder],
+                  ["IBAN", bank.iban],
+                  ["Account Number", bank.account_number],
+                ]
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-[#9a5b78]">{k}</p>
+                        <p className="truncate text-sm font-semibold text-[#3d2030]">{v}</p>
+                      </div>
+                      <button type="button" onClick={() => copy(v)} className="grid h-8 w-8 place-items-center rounded-lg text-[#ff4d94]" aria-label={`Copy ${k}`}>
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
               </div>
-            ))}
-          {mediaUrl(bank.qr_url) && <img src={mediaUrl(bank.qr_url)} alt="Bank QR code" className="mx-auto h-44 w-44 rounded-xl border border-rose-200 bg-white object-contain p-2" />}
-          <div>
-            <Label htmlFor="shot">Payment screenshot</Label>
-            <label
-              htmlFor="shot"
-              className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-6 text-sm text-muted-foreground hover:border-primary/50"
-            >
-              {file ? <CheckCircle2 className="h-6 w-6 text-success" /> : <Upload className="h-6 w-6" />}
-              {file ? file.name : "Tap to upload (JPG/PNG, max 5 MB)"}
+              <div className="text-center">
+                <p className="text-xs font-semibold text-[#ff4d94]">Scan QR Code</p>
+                {mediaUrl(bank.qr_url) ? (
+                  <img src={mediaUrl(bank.qr_url)} alt="Bank QR code" className="mx-auto mt-2 h-32 w-32 rounded-xl border border-pink-100 bg-white object-contain p-1" />
+                ) : (
+                  <p className="mt-6 text-xs text-[#9a5b78]">QR will show after the salon adds one.</p>
+                )}
+                <p className="mt-1 text-[11px] text-[#9a5b78]">Pay using your banking app</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-3xl border border-pink-100 bg-white p-4">
+            <p className="font-semibold text-[#ff4d94]">Upload Payment Receipt</p>
+            <p className="text-sm text-[#9a5b78]">After transferring the payment, upload your receipt below.</p>
+            <label htmlFor="shot" className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-pink-200 bg-[#fff7fb] p-8 text-sm text-[#9a5b78]">
+              {file ? <CheckCircle2 className="h-7 w-7 text-[#ff4d94]" /> : <Upload className="h-7 w-7 text-[#ff4d94]" />}
+              <span className="font-semibold text-[#ff4d94]">{file ? file.name : "Tap to upload receipt"}</span>
+              <span className="text-xs">JPG, PNG or PDF (Max 5MB)</span>
             </label>
-            <input id="shot" type="file" accept="image/*" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <input id="shot" type="file" accept="image/*,.pdf" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </div>
         </div>
       )}
@@ -157,10 +170,9 @@ export function PaymentForm({
         </div>
       )}
 
-      <Button onClick={submit} disabled={busy || !method || (method === "wallet" && balance < amount)} className="h-12 w-full rounded-full text-base">
+      <Button onClick={submit} disabled={busy || !method || (method === "wallet" && balance < amount)} className="h-12 w-full rounded-full bg-[#ff4d94] text-base">
         {busy ? "Submitting…" : submitLabel}
       </Button>
-      <p className="text-center text-xs text-muted-foreground">Bank transfers are verified manually by our team, usually within minutes.</p>
     </div>
   );
 }

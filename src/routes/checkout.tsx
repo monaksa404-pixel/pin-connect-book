@@ -109,18 +109,25 @@ function Checkout() {
     navigate({ to: "/my-bookings" });
   };
 
-  const shell = (title: string, step: string, body: ReactNode) => (
-    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
+  const shell = (title: string, step: number, body: ReactNode) => (
+    <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
       <div className="mx-auto max-w-3xl">
-        <p className="text-xs font-semibold tracking-widest text-rose-400">{step}</p>
-        <h1 className="font-display text-4xl font-semibold text-rose-950">{title}</h1>
+        <ol className="mb-4 flex items-center justify-between text-[11px] font-semibold text-[#9a5b78]">
+          {["Services", "Cart", "Details", "Payment"].map((label, i) => (
+            <li key={label} className="flex flex-1 flex-col items-center gap-1">
+              <span className={`grid h-8 w-8 place-items-center rounded-full ${i + 1 <= step ? "bg-[#ff4d94] text-white" : "bg-white"}`}>{i + 1}</span>
+              {label}
+            </li>
+          ))}
+        </ol>
+        <h1 className="font-display text-4xl font-semibold text-[#5c2344]">{title}</h1>
         {body}
       </div>
     </div>
   );
 
   if (view === "card" || view === "otp") {
-    return shell(view === "card" ? "Payment" : "Enter OTP", "STEP 4", (
+    return shell(view === "card" ? "Payment" : "Enter OTP", 4, (
       <div className="mt-4 space-y-4">
         <div className="rounded-3xl bg-white p-4 shadow-sm">
           {view === "card" ? (
@@ -152,12 +159,15 @@ function Checkout() {
   }
 
   if (view === "pay") {
-    return shell("Payment", "STEP 4", (
+    return shell("Payment", 4, (
       <div className="mt-2">
-        <p className="text-rose-900/60">Complete your payment using the selected method.</p>
-        <button type="button" onClick={() => setView("details")} className="mt-3 text-sm font-semibold text-rose-600">Change method</button>
-        <div className="mt-4 rounded-3xl bg-white p-4 shadow-sm">
-          <PaymentForm settings={settings} amount={advance} userId={user!.id} only={method} submitLabel={method === "bank" ? "Submit Payment" : `Pay ${sar(advance)}`} onSubmit={onSubmit} />
+        <p className="text-[#9a5b78]">Complete your payment using the selected method.</p>
+        <div className="mt-3 flex items-center justify-between rounded-3xl bg-white p-4 shadow-sm">
+          <p className="font-semibold text-[#ff4d94]">{method === "bank" ? "Bank Transfer" : "Wallet Balance"}</p>
+          <button type="button" onClick={() => setView("details")} className="rounded-full border border-pink-200 px-3 py-1 text-sm font-semibold text-[#ff4d94]">Change</button>
+        </div>
+        <div className="mt-4">
+          <PaymentForm settings={settings} amount={advance} userId={user!.id} only={method === "card" ? "bank" : method} submitLabel={method === "bank" ? "Submit Payment" : `Pay ${sar(advance)}`} onSubmit={onSubmit} />
         </div>
         <div className="mt-4 rounded-3xl bg-white p-4 text-sm shadow-sm">
           <p className="font-semibold text-rose-600">Payment Summary</p>
@@ -169,7 +179,7 @@ function Checkout() {
     ));
   }
 
-  return shell("Your details", "STEP 3", (
+  return shell("Your details", 3, (
     <div className="mt-4 space-y-4">
       <div className="grid gap-3 rounded-3xl bg-white p-4 shadow-sm sm:grid-cols-2">
         <div><Label htmlFor="n">Full name</Label><Input id="n" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-2xl" /></div>
@@ -178,7 +188,11 @@ function Checkout() {
         <div><Label htmlFor="no">Notes (optional)</Label><Textarea id="no" value={notes} maxLength={500} placeholder="Any special request..." onChange={(e) => setNotes(e.target.value)} className="mt-1 rounded-2xl" /></div>
       </div>
       <div className="rounded-3xl bg-white p-4 shadow-sm">
-        <h2 className="font-display text-2xl font-semibold text-rose-600">Summary</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-2xl font-semibold text-[#ff4d94]">Summary</h2>
+          <button type="button" onClick={() => navigate({ to: "/cart" })} className="rounded-full border border-pink-200 px-3 py-1 text-sm text-[#ff4d94]">Edit Date & Time</button>
+        </div>
+        {slot && <p className="mt-2 text-sm text-[#9a5b78]">{slot.date} at {fmtTime(slot.time)}</p>}
         {lines.map((l) => (
           <div key={l.service.id} className="mt-3 flex items-center gap-3">
             <img src={serviceImage(l.service)} alt="" className="h-12 w-12 rounded-xl object-cover" />
@@ -193,15 +207,15 @@ function Checkout() {
         </div>
       </div>
       <div className="rounded-3xl bg-white p-4 shadow-sm">
-        <p className="font-semibold text-rose-600">Payment Method <span className="text-sm font-normal text-rose-900/50">(Advance {settings.advance_percent}%)</span></p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          {(["bank", "wallet", "card"] as const).map((m) => (
-            <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-2xl border p-4 text-sm font-semibold ${method === m ? "border-rose-500 text-rose-600" : "border-rose-100 text-rose-900/70"}`}>
+        <p className="font-semibold text-[#ff4d94]">Payment Method <span className="text-sm font-normal text-[#9a5b78]">(Advance {settings.advance_percent}%)</span></p>
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          {(["bank", "card", "wallet"] as const).map((m) => (
+            <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-2xl border p-3 text-sm font-semibold ${method === m ? "border-[#ff4d94] text-[#ff4d94]" : "border-pink-100 text-[#9a5b78]"}`}>
               {m === "bank" ? "Bank Transfer" : m === "wallet" ? "Wallet Balance" : "Credit/Debit Card"}
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => setView(method === "card" ? "card" : "pay")} className="mt-4 h-12 w-full rounded-full bg-rose-600 font-semibold text-white">Pay {sar(advance)} ({settings.advance_percent}%) →</button>
+        <button type="button" onClick={() => setView(method === "card" ? "card" : "pay")} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white">Pay {sar(advance)} ({settings.advance_percent}%) →</button>
       </div>
     </div>
   ));

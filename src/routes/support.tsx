@@ -18,7 +18,7 @@ export const Route = createFileRoute("/support")({
 function SupportPage() {
   return (
     <>
-      <div className="mx-auto min-h-screen max-w-3xl bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
+      <div className="mx-auto min-h-screen max-w-3xl bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
         <RequireAuth what="chat with us"><Chat /></RequireAuth>
       </div>
     </>

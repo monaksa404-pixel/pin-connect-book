@@ -1,11 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Clock, MapPin, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { format, startOfToday } from "date-fns";
+import { CalendarDays, Clock, MapPin, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { advanceFor, DEFAULT_SETTINGS, sar, serviceImage, servicesQuery, settingsQuery } from "@/lib/data";
+import { advanceFor, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, servicesQuery, settingsQuery, timeSlots } from "@/lib/data";
 import { FullNotice } from "@/components/FullNotice";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
@@ -18,18 +21,39 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
-  const { lines, setQty, remove, clear, total, add, setSlot } = useCart();
+  const { lines, setQty, remove, clear, total, add, setSlot, slot } = useCart();
   const navigate = useNavigate();
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
   const { data: services = [] } = useQuery(servicesQuery);
   const { advance, remaining } = advanceFor(total, settings.advance_percent);
   const [fullOpen, setFullOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : new Date());
+  const [time, setTime] = useState<string | null>(slot?.time ?? null);
+  const slots = useMemo(() => {
+    const all = timeSlots(settings.open_time.slice(0, 5), settings.close_time.slice(0, 5), settings.slot_minutes);
+    if (!date || format(date, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd")) return all;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return all.filter((t) => {
+      const [h = 0, m = 0] = t.split(":").map(Number);
+      return h * 60 + m > nowMin;
+    });
+  }, [date, settings]);
   const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
       <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
       <div className="mx-auto max-w-3xl">
+        <ol className="mb-4 flex items-center justify-between text-[11px] font-semibold text-[#9a5b78]">
+          {["Services", "Your Cart", "Date & Time", "Details"].map((label, i) => (
+            <li key={label} className="flex flex-1 flex-col items-center gap-1">
+              <span className={`grid h-8 w-8 place-items-center rounded-full ${i <= 1 ? "bg-[#ff4d94] text-white" : "bg-white text-[#9a5b78]"}`}>{i < 1 ? "✓" : i + 1}</span>
+              {label}
+            </li>
+          ))}
+        </ol>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-display text-4xl font-semibold text-[#5c2344]">My Cart</h1>
@@ -94,37 +118,66 @@ function CartPage() {
 
         {lines.length > 0 && (
           <div className="mt-6 rounded-3xl bg-white p-4 shadow-sm">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <h2 className="font-semibold text-[#ff4d94]">Price Summary</h2>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between"><span>Total</span><span className="font-semibold">{sar(total)}</span></div>
+              <div className="flex justify-between"><span>Pay now ({settings.advance_percent}%)</span><span className="font-semibold">{sar(advance)}</span></div>
+              <div className="flex justify-between"><span>Pay at salon (cash)</span><span className="font-semibold">{sar(remaining)}</span></div>
+            </div>
+            <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#ffe4f2] p-3">
+              <div><p className="font-semibold text-[#ff4d94]">Remaining amount</p><p className="text-xs text-[#9a5b78]">You will pay at the salon</p></div>
+              <p className="text-xl font-semibold text-[#ff4d94]">{sar(remaining)}</p>
+            </div>
+            <button type="button" onClick={() => settings.bookings_full ? setFullOpen(true) : setDateOpen(true)} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#ff4d94] font-semibold text-white">
+              <CalendarDays className="h-4 w-4" /> Choose date & time →
+            </button>
+            <Link to="/services" className="mt-3 grid h-12 place-items-center rounded-full border border-pink-200 font-semibold text-[#ff4d94]">+ Add more services</Link>
+          </div>
+        )}
+      </div>
+      {dateOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-pink-950/40 p-3 md:items-center">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] bg-white p-4 shadow-xl">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-[#9a5b78]">Total Amount ({lines.reduce((n, l) => n + l.qty, 0)} items)</p>
-                <p className="font-display text-3xl font-semibold text-[#ff4d94]">{sar(total)}</p>
+                <h2 className="font-display text-3xl font-semibold text-[#3d2030]">Choose <span className="text-[#ff4d94]">Date & Time</span></h2>
+                <p className="text-sm text-[#9a5b78]">Select your preferred date and available time slot.</p>
               </div>
-              <div className="rounded-2xl bg-[#fff0f6] p-3">
-                <p className="text-lg font-semibold text-[#ff4d94]">{sar(advance)}</p>
-                <p className="text-xs font-semibold text-[#5c2344]">Advance Payment</p>
-                <p className="text-[11px] text-[#9a5b78]">Pay now ({settings.advance_percent}%)</p>
+              <button type="button" onClick={() => setDateOpen(false)} className="text-2xl text-[#9a5b78]" aria-label="Close">×</button>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="rounded-3xl border border-pink-100 p-3">
+                <p className="mb-2 font-semibold text-[#3d2030]">Select Date</p>
+                <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={{ before: startOfToday() }} />
+                <p className="mt-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]">Today: {format(new Date(), "EEE, d MMM yyyy")}</p>
               </div>
-              <div className="rounded-2xl bg-[#fff0f6] p-3">
-                <p className="text-lg font-semibold text-[#ff4d94]">{sar(remaining)}</p>
-                <p className="text-xs font-semibold text-[#5c2344]">Cash at Salon</p>
-                <p className="text-[11px] text-[#9a5b78]">Pay the rest at the salon after the service</p>
+              <div className="rounded-3xl border border-pink-100 p-3">
+                <p className="font-semibold text-[#3d2030]">Select Time</p>
+                <p className="text-xs text-[#9a5b78]">{date ? `Available time slots for ${format(date, "EEE, d MMM yyyy")}` : "Pick a date first"}</p>
+                <div className="mt-3 grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
+                  {slots.map((t) => (
+                    <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)}</button>
+                  ))}
+                  {date && slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">No times left today.</p>}
+                </div>
               </div>
             </div>
             <button
               type="button"
+              disabled={!date || !time}
               onClick={() => {
-                if (settings.bookings_full) { setFullOpen(true); return; }
-                const day = new Date();
-                setSlot({ date: day.toISOString().slice(0, 10), time: settings.open_time.slice(0, 5) });
+                if (!date || !time) return;
+                setSlot({ date: format(date, "yyyy-MM-dd"), time });
+                setDateOpen(false);
                 navigate({ to: "/checkout" });
               }}
-              className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white"
+              className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-50"
             >
-              Proceed to Checkout →
+              Confirm Date & Time →
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

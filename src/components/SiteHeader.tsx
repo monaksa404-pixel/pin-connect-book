@@ -60,21 +60,19 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-1">
-          {user && (
-            <Link to="/notifications" className="relative rounded-full p-2 hover:bg-secondary" aria-label="Notifications">
-              <Bell className="h-5 w-5" />
-              {unread > 0 && (
-                <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                  {unread}
-                </span>
-              )}
-            </Link>
-          )}
-          <Link to="/cart" className="relative rounded-full p-2 hover:bg-secondary" aria-label="Cart">
+        <div className="flex items-center gap-1 text-[#ff4d94]">
+          <Link to="/notifications" className="relative rounded-full p-2" aria-label="Notifications">
+            <Bell className="h-5 w-5" />
+            {unread > 0 && (
+              <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-[#ff4d94] px-1 text-[10px] font-bold text-white">
+                {unread}
+              </span>
+            )}
+          </Link>
+          <Link to="/cart" className="relative rounded-full p-2" aria-label="Cart">
             <ShoppingBag className="h-5 w-5" />
             {count > 0 && (
-              <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+              <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-[#ff4d94] px-1 text-[10px] font-bold text-white">
                 {count}
               </span>
             )}
