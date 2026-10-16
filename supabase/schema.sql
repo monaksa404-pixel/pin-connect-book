@@ -705,6 +705,78 @@ begin
 end $$;
 grant execute on function public.admin_set_contact(uuid, boolean, text, text, text) to authenticated;
 
+alter table public.settings add column if not exists logo_url text;
+
+create table if not exists public.homepage_sliders (
+  id uuid primary key default gen_random_uuid(),
+  image_url text not null,
+  service_id uuid references public.services(id) on delete set null,
+  title text,
+  sort int not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table public.homepage_sliders enable row level security;
+drop policy if exists "sliders public read" on public.homepage_sliders;
+create policy "sliders public read" on public.homepage_sliders for select to anon, authenticated using (active or public.has_role(auth.uid(), 'admin'));
+drop policy if exists "sliders admin all" on public.homepage_sliders;
+create policy "sliders admin all" on public.homepage_sliders for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+grant select on public.homepage_sliders to anon, authenticated;
+grant insert, update, delete on public.homepage_sliders to authenticated;
+
+create table if not exists public.wallet_withdrawals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_code text,
+  amount numeric(10,2) not null check (amount > 0),
+  account_name text not null,
+  account_number text not null,
+  iban text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reason text,
+  created_at timestamptz not null default now()
+);
+alter table public.wallet_withdrawals enable row level security;
+drop policy if exists "withdraw read" on public.wallet_withdrawals;
+create policy "withdraw read" on public.wallet_withdrawals for select to authenticated
+  using (user_id = auth.uid() or public.has_role(auth.uid(), 'admin'));
+drop policy if exists "withdraw insert own" on public.wallet_withdrawals;
+create policy "withdraw insert own" on public.wallet_withdrawals for insert to authenticated
+  with check (user_id = auth.uid() and status = 'pending');
+grant select, insert on public.wallet_withdrawals to authenticated;
+
+create or replace function public.withdrawal_before_insert()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare p public.profiles;
+begin
+  select * into p from public.profiles where id = new.user_id;
+  if p.wallet_balance < new.amount then raise exception 'LOW_BALANCE'; end if;
+  new.user_code := p.user_code;
+  new.status := 'pending';
+  return new;
+end $$;
+drop trigger if exists withdrawal_before_insert on public.wallet_withdrawals;
+create trigger withdrawal_before_insert before insert on public.wallet_withdrawals
+  for each row execute function public.withdrawal_before_insert();
+
+create or replace function public.review_withdrawal(p_id uuid, p_approve boolean, p_reason text)
+returns void language plpgsql security definer set search_path = public as $$
+declare w public.wallet_withdrawals;
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  select * into w from public.wallet_withdrawals where id = p_id for update;
+  if w.id is null or w.status <> 'pending' then raise exception 'NOT_PENDING'; end if;
+  if p_approve then
+    update public.profiles set wallet_balance = wallet_balance - w.amount where id = w.user_id and wallet_balance >= w.amount;
+    if not found then raise exception 'LOW_BALANCE'; end if;
+    update public.wallet_withdrawals set status = 'approved', reason = nullif(trim(p_reason), '') where id = p_id;
+  else
+    update public.wallet_withdrawals set status = 'rejected', reason = nullif(trim(p_reason), '') where id = p_id;
+  end if;
+end $$;
+grant execute on function public.review_withdrawal(uuid, boolean, text) to authenticated;
+
 do $$ begin
   alter publication supabase_realtime add table public.wallet_topups;
 exception when others then null; end $$;

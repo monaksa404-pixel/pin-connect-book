@@ -11,8 +11,9 @@ import { FullNotice } from "@/components/FullNotice";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/services")({
-  validateSearch: (s: Record<string, unknown>): { category?: string | undefined } => ({
+  validateSearch: (s: Record<string, unknown>): { category?: string | undefined; service?: string | undefined } => ({
     category: typeof s["category"] === "string" ? (s["category"] as string) : undefined,
+    service: typeof s["service"] === "string" ? (s["service"] as string) : undefined,
   }),
   head: () => ({
     meta: [
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/services")({
 });
 
 function ServicesPage() {
-  const { category } = Route.useSearch();
+  const { category, service } = Route.useSearch();
   const { data: services = [], isLoading } = useQuery(servicesQuery);
   const { lines, add, setQty, count, total } = useCart();
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
@@ -37,7 +38,7 @@ function ServicesPage() {
     toast.success(`${s.name} added`);
   };
   const active = category ?? "All";
-  const list = active === "All" ? services : services.filter((s) => s.category === active);
+  const list = (service ? services.filter((s) => s.id === service) : active === "All" ? services : services.filter((s) => s.category === active));
 
   return (
     <>
@@ -70,7 +71,10 @@ function ServicesPage() {
                 <div key={s.id} className="flex flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
                   <img src={serviceImage(s)} alt={s.name} loading="lazy" className="aspect-[16/10] w-full object-cover" />
                   <div className="flex flex-1 flex-col p-5">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-primary">{s.category}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-primary">{s.category}</p>
+                      {s.popular && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white">HOT 🔥</span>}
+                    </div>
                     <h3 className="mt-1 font-display text-xl font-semibold">{s.name}</h3>
                     <p className="mt-1 flex-1 text-sm text-muted-foreground">{s.description}</p>
                     <div className="mt-4 flex items-center justify-between">

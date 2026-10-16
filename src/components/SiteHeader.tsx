@@ -37,10 +37,13 @@ export function SiteHeader() {
   });
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center">
-          <img src="/images/logo.png" alt={settings?.salon_name ?? "The Beauty House"} className="h-12 w-auto" />
+    <header className="sticky top-0 z-40 border-b border-rose-100 bg-[#fff5f8]/95 backdrop-blur-md">
+      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[auto_1fr_auto] items-center px-3 md:flex md:justify-between md:px-4">
+        <button className="rounded-full p-2 text-rose-700 md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+        <Link to="/" className="col-start-2 flex justify-center md:col-auto md:justify-start">
+          <img src={settings?.logo_url || "/images/logo.png"} alt={settings?.salon_name ?? "The Beauty House"} className="h-12 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
@@ -101,9 +104,6 @@ export function SiteHeader() {
               </Link>
             </Button>
           )}
-          <button className="rounded-full p-2 md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
         </div>
       </div>
 

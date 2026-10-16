@@ -15,12 +15,15 @@ export const categoryImage: Record<string, string> = {
   Massage: hero,
 };
 
-export const serviceImage = (s: Pick<Service, "image_url" | "category">) => {
-  const u = s.image_url?.trim();
-  if (!u) return categoryImage[s.category] || hero;
-  if (u.startsWith("http") || u.startsWith("/") || u.startsWith("data:") || u.startsWith("blob:")) return u;
-  return supabase.storage.from("media").getPublicUrl(u).data.publicUrl || categoryImage[s.category] || hero;
-};
+export function mediaUrl(u?: string | null) {
+  const v = u?.trim();
+  if (!v) return "";
+  if (v.startsWith("http") || v.startsWith("/") || v.startsWith("data:") || v.startsWith("blob:")) return v;
+  return supabase.storage.from("media").getPublicUrl(v).data.publicUrl;
+}
+
+export const serviceImage = (s: Pick<Service, "image_url" | "category">) =>
+  mediaUrl(s.image_url) || categoryImage[s.category] || hero;
 
 export const DEFAULT_SETTINGS: Settings = {
   salon_name: "The Beauty House",
@@ -43,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   phone: "+966 53 462 8789",
   address: "King Fahd Road, Riyadh, Saudi Arabia",
   map_url: "https://maps.google.com/?q=Riyadh",
+  logo_url: null,
 };
 
 const demo = (

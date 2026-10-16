@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, settingsQuery } from "@/lib/data";
+import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
 import type { BankAccount, Booking, Profile, Service, Settings, Topup } from "@/lib/types";
 import { RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
@@ -39,17 +39,17 @@ function AdminGate() {
 
 function Admin() {
   return (
-    <div className="min-h-screen bg-muted/40">
-      <header className="border-b border-border bg-card">
+    <div className="min-h-screen bg-gradient-to-b from-rose-50 to-background">
+      <header className="border-b border-rose-100 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <h1 className="text-2xl font-semibold">Admin panel</h1>
+          <h1 className="font-display text-2xl font-semibold text-rose-700">The Beauty House · Admin</h1>
           <Button asChild variant="ghost" size="sm"><Link to="/"><ArrowLeft className="mr-1 h-4 w-4" />Back to site</Link></Button>
         </div>
       </header>
       <div className="mx-auto max-w-7xl px-4 py-6">
         <Tabs defaultValue="bookings">
-          <TabsList className="mb-6 flex h-auto flex-wrap justify-start">
-            {["bookings", "customers", "banks", "wallet", "services", "settings", "support", "telegram"].map((t) => (
+          <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-1 rounded-2xl bg-rose-100/80 p-1">
+            {["bookings", "customers", "banks", "wallet", "withdrawals", "services", "sliders", "settings", "support", "telegram"].map((t) => (
               <TabsTrigger key={t} value={t} className="capitalize">{t}</TabsTrigger>
             ))}
           </TabsList>
@@ -57,7 +57,9 @@ function Admin() {
           <TabsContent value="customers"><CustomersTab /></TabsContent>
           <TabsContent value="banks"><BanksTab /></TabsContent>
           <TabsContent value="wallet"><WalletTab /></TabsContent>
+          <TabsContent value="withdrawals"><WithdrawalsTab /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
+          <TabsContent value="sliders"><SlidersTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>
           <TabsContent value="support"><SupportTab /></TabsContent>
           <TabsContent value="telegram"><TelegramTab /></TabsContent>
@@ -316,7 +318,9 @@ function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAc
     <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-2">
       <div>
         <p className="font-semibold">{person.full_name || "No name"} <span className="font-mono text-xs text-muted-foreground">{person.user_code}</span></p>
-        <p className="text-sm text-muted-foreground">{person.phone} · Wallet {person.wallet_balance} SAR</p>
+        <p className="text-sm">Mobile: {person.phone || "—"}</p>
+        <p className="text-sm">City: {person.city || "—"}</p>
+        <p className="text-sm font-semibold text-rose-700">Wallet balance: {sar(Number(person.wallet_balance || 0))}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">Bank <Switch checked={allowBank} onCheckedChange={setAllowBank} /></label>
@@ -340,6 +344,7 @@ function ContactFields({ person }: { person: Profile }) {
   const [wa, setWa] = useState(person.assigned_whatsapp ?? "");
   const [addr, setAddr] = useState(person.assigned_address ?? "");
   const [map, setMap] = useState(person.assigned_map_url ?? "");
+  const [query, setQuery] = useState(person.assigned_address ?? "");
   const save = async () => {
     const { error } = await supabase.rpc("admin_set_contact", { p_user: person.id, p_enabled: on, p_whatsapp: wa, p_address: addr, p_map: map });
     if (error) { toast.error(error.message); return; }
@@ -354,6 +359,11 @@ function ContactFields({ person }: { person: Profile }) {
         <Input placeholder="Location address" value={addr} onChange={(e) => setAddr(e.target.value)} />
         <Input placeholder="Google Maps link" value={map} onChange={(e) => setMap(e.target.value)} />
       </div>
+      <div className="flex flex-wrap gap-2">
+        <Input className="max-w-sm" placeholder="Search a city or salon on the map" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <Button type="button" size="sm" variant="outline" onClick={() => { setAddr(query); setMap(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`); }}>Use this location</Button>
+      </div>
+      {query && <iframe title="Map search" className="h-52 w-full rounded-2xl border border-rose-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`} />}
       <Button size="sm" variant="outline" onClick={save}>Save location</Button>
     </div>
   );
@@ -396,6 +406,7 @@ function BanksTab() {
           <div>
             <p className="font-semibold">{b.account_name} {!b.active && <span className="text-xs text-destructive">Disabled</span>}</p>
             <p className="text-xs text-muted-foreground">{b.account_holder} · {b.iban}</p>
+            {mediaUrl(b.qr_url) && <img src={mediaUrl(b.qr_url)} alt="QR" className="mt-2 h-20 w-20 rounded-lg bg-white object-contain" />}
           </div>
           <Button size="sm" variant="outline" onClick={() => setEdit(b)}>Edit</Button>
         </div>
@@ -545,7 +556,7 @@ function ServicesTab() {
                 <Input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setPreview(f ? URL.createObjectURL(f) : null); }} />
               </div>
               <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-sm"><Switch checked={edit.popular} onCheckedChange={(v) => setEdit({ ...edit, popular: v })} />Popular</label>
+                <label className="flex items-center gap-2 text-sm"><Switch checked={edit.popular} onCheckedChange={(v) => setEdit({ ...edit, popular: v })} />Popular — shows HOT 🔥</label>
                 <label className="flex items-center gap-2 text-sm"><Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} />Visible</label>
               </div>
               <Button className="w-full" onClick={save}>Save</Button>
@@ -562,10 +573,18 @@ function SettingsTab() {
   const qc = useQueryClient();
   const { data } = useQuery(settingsQuery);
   const [s, setS] = useState<Settings | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const cur = s ?? data ?? DEFAULT_SETTINGS;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...cur, [k]: v });
   const save = async () => {
-    const { error } = await supabase.from("settings").update({ ...cur, advance_percent: Number(cur.advance_percent), slot_minutes: Number(cur.slot_minutes), updated_at: new Date().toISOString() }).eq("id", 1);
+    let logo_url = cur.logo_url;
+    if (logoFile) {
+      const path = `logo/${Date.now()}-${logoFile.name.replace(/[^a-z0-9.]/gi, "")}`;
+      const up = await supabase.storage.from("media").upload(path, logoFile);
+      if (up.error) { toast.error(up.error.message); return; }
+      logo_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+    }
+    const { error } = await supabase.from("settings").update({ ...cur, logo_url, advance_percent: Number(cur.advance_percent), slot_minutes: Number(cur.slot_minutes), updated_at: new Date().toISOString() }).eq("id", 1);
     if (error) { toast.error(error.message); return; }
     toast.success("Settings saved");
     setS(null);
@@ -597,9 +616,115 @@ function SettingsTab() {
         <h3 className="font-semibold">Salon info</h3>
         <div className="grid gap-3 sm:grid-cols-2">
           {text("salon_name", "Salon name")}{text("tagline", "Tagline")}{text("phone", "Phone")}{text("whatsapp", "WhatsApp number (e.g. 9665…)")}{text("address", "Address")}{text("map_url", "Google Maps link")}
+          <div className="sm:col-span-2">
+            <Label>Website logo</Label>
+            <img src={logoFile ? URL.createObjectURL(logoFile) : (cur.logo_url || "/images/logo.png")} alt="" className="mt-2 h-16 w-auto" />
+            <Input className="mt-2" type="file" accept="image/*" onChange={(e) => { setLogoFile(e.target.files?.[0] ?? null); setS({ ...cur }); }} />
+          </div>
         </div>
       </section>
       <Button className="lg:col-span-2" onClick={save} disabled={!s}>Save settings</Button>
+    </div>
+  );
+}
+
+function SlidersTab() {
+  const qc = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [serviceId, setServiceId] = useState("");
+  const [title, setTitle] = useState("");
+  const { data: services = [] } = useQuery({
+    queryKey: ["admin-services"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("services").select("id, name").order("sort");
+      if (error) throw error;
+      return data as { id: string; name: string }[];
+    },
+  });
+  const { data: rows = [] } = useQuery({
+    queryKey: ["admin-sliders"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("homepage_sliders").select("*").order("sort");
+      if (error) throw error;
+      return data as { id: string; image_url: string; service_id: string | null; title: string | null; active: boolean }[];
+    },
+  });
+  const add = async () => {
+    if (!file) { toast.error("Choose a slider image"); return; }
+    const path = `sliders/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, "")}`;
+    const up = await supabase.storage.from("media").upload(path, file);
+    if (up.error) { toast.error(up.error.message); return; }
+    const image_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+    const { error } = await supabase.from("homepage_sliders").insert({ image_url, service_id: serviceId || null, title: title || null, sort: rows.length });
+    if (error) { toast.error(error.message); return; }
+    setFile(null); setTitle(""); setServiceId("");
+    toast.success("Slider added");
+    qc.invalidateQueries({ queryKey: ["admin-sliders"] });
+    qc.invalidateQueries({ queryKey: ["sliders"] });
+  };
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("homepage_sliders").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["admin-sliders"] });
+    qc.invalidateQueries({ queryKey: ["sliders"] });
+  };
+  return (
+    <div className="space-y-4">
+      <div className="space-y-3 rounded-2xl border border-rose-100 bg-white p-4">
+        <h3 className="font-semibold">Add slider</h3>
+        <Input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">No service link</option>
+          {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <Input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <Button className="rounded-full" onClick={add}>Add slider</Button>
+      </div>
+      {rows.map((r) => (
+        <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-rose-100 bg-white p-3">
+          <img src={mediaUrl(r.image_url)} alt="" className="h-16 w-28 rounded-xl object-cover" />
+          <div className="flex-1 text-sm"><p className="font-semibold">{r.title || "Slider"}</p><p className="text-muted-foreground">{services.find((s) => s.id === r.service_id)?.name || "No service link"}</p></div>
+          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove(r.id)}>Remove</Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WithdrawalsTab() {
+  const qc = useQueryClient();
+  const { data = [] } = useQuery({
+    queryKey: ["admin-withdrawals"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("wallet_withdrawals").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as { id: string; user_code: string | null; amount: number; account_name: string; account_number: string; iban: string; status: string; created_at: string }[];
+    },
+  });
+  const review = async (id: string, approve: boolean) => {
+    const { error } = await supabase.rpc("review_withdrawal", { p_id: id, p_approve: approve, p_reason: approve ? "Approved" : "Rejected" });
+    if (error) { toast.error(error.message); return; }
+    toast.success(approve ? "Withdrawal approved" : "Withdrawal rejected");
+    qc.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+  return (
+    <div className="space-y-3">
+      {data.length === 0 && <p className="text-sm text-muted-foreground">No withdrawal requests.</p>}
+      {data.map((w) => (
+        <div key={w.id} className="rounded-2xl border border-rose-100 bg-white p-4 text-sm">
+          <div className="flex justify-between"><p className="font-semibold">{w.user_code} · {sar(Number(w.amount))}</p><StatusBadge status={w.status} /></div>
+          <p>Account name: {w.account_name}</p>
+          <p>Account number: {w.account_number}</p>
+          <p>IBAN: {w.iban}</p>
+          {w.status === "pending" && (
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" onClick={() => review(w.id, true)}>Approve</Button>
+              <Button size="sm" variant="destructive" onClick={() => review(w.id, false)}>Reject</Button>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

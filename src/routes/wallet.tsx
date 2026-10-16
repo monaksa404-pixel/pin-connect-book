@@ -30,6 +30,7 @@ function WalletPage() {
   const [pin, setPin] = useState("");
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wd, setWd] = useState({ amount: "", account_name: "", account_number: "", iban: "" });
   const { data: rows = [] } = useQuery({
     queryKey: ["my-topups", user?.id],
     enabled: !!user && isSupabaseConfigured,
@@ -55,6 +56,27 @@ function WalletPage() {
     qc.invalidateQueries({ queryKey: ["my-topups"] });
   };
 
+  const withdraw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = Number(wd.amount);
+    if (!(n > 0)) { toast.error("Enter an amount."); return; }
+    if (n > Number(profile?.wallet_balance ?? 0)) { toast.error("Amount is higher than your wallet balance."); return; }
+    if (wd.account_name.trim().length < 2 || wd.account_number.trim().length < 4 || wd.iban.trim().length < 8) {
+      toast.error("Enter account name, account number, and IBAN.");
+      return;
+    }
+    const { error } = await supabase.from("wallet_withdrawals").insert({
+      user_id: user!.id,
+      amount: n,
+      account_name: wd.account_name.trim(),
+      account_number: wd.account_number.trim(),
+      iban: wd.iban.trim(),
+    });
+    if (error) { toast.error(friendlyError(error)); return; }
+    setWd({ amount: "", account_name: "", account_number: "", iban: "" });
+    toast.success("Withdrawal request sent");
+  };
+
   return (
     <>
       <PageHeader eyebrow="Account" title="Wallet" />
@@ -77,6 +99,17 @@ function WalletPage() {
             </div>
           ))}
         </div>
+        <form onSubmit={withdraw} className="space-y-3 rounded-3xl border border-border bg-card p-6 shadow-soft md:col-span-2">
+          <h2 className="font-display text-2xl font-semibold">Withdraw</h2>
+          <p className="text-sm text-muted-foreground">The salon reviews the request before the amount leaves your wallet.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><Label>Amount (SAR)</Label><Input type="number" min={1} value={wd.amount} onChange={(e) => setWd({ ...wd, amount: e.target.value })} className="mt-1" /></div>
+            <div><Label>Account name</Label><Input value={wd.account_name} onChange={(e) => setWd({ ...wd, account_name: e.target.value })} className="mt-1" /></div>
+            <div><Label>Account number</Label><Input value={wd.account_number} onChange={(e) => setWd({ ...wd, account_number: e.target.value })} className="mt-1" /></div>
+            <div><Label>IBAN</Label><Input value={wd.iban} onChange={(e) => setWd({ ...wd, iban: e.target.value })} className="mt-1" /></div>
+          </div>
+          <Button className="rounded-full">Request withdrawal</Button>
+        </form>
       </div>
     </>
   );

@@ -18,6 +18,7 @@ import { CartProvider } from "@/lib/cart";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { MobileNav } from "@/components/MobileNav";
 import { Toaster } from "@/components/ui/sonner";
 import { ReasonPopup } from "@/components/ReasonPopup";
 
@@ -143,6 +144,7 @@ function RootComponent() {
             <Outlet />
           </main>
           {!isAdmin && <SiteFooter />}
+          {!isAdmin && <MobileNav />}
           <ReasonPopup />
           <Toaster richColors position="top-center" />
         </CartProvider>

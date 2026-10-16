@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Building2, Copy, Wallet, Upload, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Settings } from "@/lib/types";
-import { sar } from "@/lib/data";
+import { mediaUrl, sar } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { useAssignedBank, useProfile } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ export function PaymentForm({
                 </Button>
               </div>
             ))}
-          {bank.qr_url && <img src={bank.qr_url} alt="Bank QR code" className="mx-auto h-40 w-40 rounded-xl border border-border object-contain" loading="lazy" />}
+          {mediaUrl(bank.qr_url) && <img src={mediaUrl(bank.qr_url)} alt="Bank QR code" className="mx-auto h-44 w-44 rounded-xl border border-rose-200 bg-white object-contain p-2" />}
           <div>
             <Label htmlFor="shot">Payment screenshot</Label>
             <label

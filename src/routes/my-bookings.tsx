@@ -46,9 +46,16 @@ function MyBookings() {
 
   // Auto popup for "pay remaining balance online"
   useEffect(() => {
-    if (pay) return;
-    const b = bookings.find((x) => x.extra_enabled && x.extra_payment_status === "awaiting" && !dismissed.includes(x.id));
-    if (b) setPay({ booking: b, kind: "extra" });
+    if (!pay) {
+      const b = bookings.find((x) => x.extra_enabled && x.extra_payment_status === "awaiting" && !dismissed.includes(x.id));
+      if (b) setPay({ booking: b, kind: "extra" });
+      return;
+    }
+    const live = bookings.find((x) => x.id === pay.booking.id);
+    const extraOn = !!live && live.extra_enabled && ["awaiting", "rejected"].includes(live.extra_payment_status);
+    const againOn = !!live && live.payment_status === "rejected";
+    if (pay.kind === "extra" && !extraOn) setPay(null);
+    if (pay.kind === "resubmit" && !againOn) setPay(null);
   }, [bookings, pay, dismissed]);
 
   const close = () => {
