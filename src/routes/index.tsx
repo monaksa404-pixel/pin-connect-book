@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Clock, Flower2, Gift, Heart, LayoutGrid, Scissors, ShoppingCart, Smile, UserRound } from "lucide-react";
 import { FullNotice } from "@/components/FullNotice";
-import { categoryImage, fmtTime, sar, serviceImage, servicesQuery, settingsQuery, DEFAULT_SETTINGS } from "@/lib/data";
+import { categoryImage, fmtTime, mediaUrl, sar, serviceImage, servicesQuery, settingsQuery, slidersQuery, DEFAULT_SETTINGS } from "@/lib/data";
 import { useCart } from "@/lib/cart";
 import { toast } from "sonner";
 
@@ -33,46 +33,51 @@ export const Route = createFileRoute("/")({
 function Index() {
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
   const { data: services = [] } = useQuery(servicesQuery);
+  const { data: dbSlides = [] } = useQuery(slidersQuery);
   const { add } = useCart();
   const [fullOpen, setFullOpen] = useState(false);
   const [slide, setSlide] = useState(0);
   const popular = (services.filter((s) => s.popular).length ? services.filter((s) => s.popular) : services).slice(0, 4);
 
+  const slides = dbSlides.length
+    ? dbSlides.map((s) => ({ src: mediaUrl(s.image_url), serviceId: s.service_id, key: s.id }))
+    : SLIDES.map((src) => ({ src, serviceId: null as string | null, key: src }));
+
   useEffect(() => {
-    const t = setInterval(() => setSlide((n) => (n + 1) % SLIDES.length), 4500);
+    const t = setInterval(() => setSlide((n) => (n + 1) % slides.length), 4500);
     return () => clearInterval(t);
-  }, []);
+  }, [slides.length]);
 
   const book = () => {
     if (settings.bookings_full) setFullOpen(true);
   };
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] pb-24 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] pb-24 md:pb-10">
       <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
       <div className="mx-auto max-w-6xl px-4 pt-4">
         <div className="relative overflow-hidden rounded-[28px] bg-rose-100 shadow-sm">
           <div className="flex transition-transform duration-500" style={{ transform: `translateX(-${slide * 100}%)` }}>
-            {SLIDES.map((src) => (
-              <img key={src} src={src} alt="The Beauty House" className="aspect-[16/10] w-full shrink-0 object-cover sm:aspect-[16/7]" />
+            {slides.map((s) => (
+              <img key={s.key} src={s.src} alt={settings.salon_name} className="aspect-[16/10] w-full shrink-0 object-cover sm:aspect-[16/7]" />
             ))}
           </div>
           {settings.bookings_full ? (
-            <button type="button" onClick={book} className="absolute bottom-[18%] left-[6%] h-12 w-[42%] rounded-full" aria-label="Book now" />
+            <button type="button" onClick={book} className="absolute inset-0" aria-label="Book now" />
           ) : (
-            <Link to="/services" className="absolute bottom-[18%] left-[6%] h-12 w-[42%] rounded-full" aria-label="Book now" />
+            <Link to="/services" search={slides[slide]?.serviceId ? { service: slides[slide].serviceId } : {}} className="absolute inset-0" aria-label="Open slide" />
           )}
           <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
-            {SLIDES.map((src, i) => (
-              <button key={src} type="button" aria-label={`Slide ${i + 1}`} onClick={() => setSlide(i)} className={`h-2 rounded-full ${i === slide ? "w-5 bg-rose-600" : "w-2 bg-white/80"}`} />
+            {slides.map((s, i) => (
+              <button key={s.key} type="button" aria-label={`Slide ${i + 1}`} onClick={() => setSlide(i)} className={`h-2 rounded-full ${i === slide ? "w-5 bg-rose-600" : "w-2 bg-white/80"}`} />
             ))}
           </div>
         </div>
 
         <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
           {CATS.map((c) => (
-            <Link key={c.label} to={c.to} search={c.search} className="flex w-[72px] shrink-0 flex-col items-center gap-2 text-center text-[11px] font-semibold text-rose-950">
-              <span className={`grid h-14 w-14 place-items-center rounded-2xl shadow-sm ${c.label === "All" ? "bg-rose-600 text-white" : "bg-white text-rose-600"}`}>
+            <Link key={c.label} to={c.to} search={c.search} className="flex w-[76px] shrink-0 flex-col items-center gap-2 text-center text-[11px] font-semibold text-rose-950">
+              <span className={`grid h-16 w-16 place-items-center rounded-2xl shadow-sm ${c.label === "All" ? "bg-rose-600 text-white" : "border border-rose-100 bg-white text-rose-600"}`}>
                 <c.icon className="h-6 w-6" />
               </span>
               {c.label}
@@ -86,9 +91,10 @@ function Index() {
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {popular.map((s) => (
-            <article key={s.id} className="overflow-hidden rounded-3xl bg-white shadow-sm">
+            <article key={s.id} className="overflow-hidden rounded-3xl border border-rose-100 bg-white shadow-sm">
               <div className="relative">
                 <img src={serviceImage(s)} alt={s.name} className="aspect-[4/3] w-full object-cover" />
+                {s.popular && <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white">HOT 🔥</span>}
                 <span className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-rose-500"><Heart className="h-4 w-4" /></span>
               </div>
               <div className="p-3">

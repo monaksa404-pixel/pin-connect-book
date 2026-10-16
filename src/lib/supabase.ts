@@ -1,5 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 
+if (typeof globalThis.WebSocket === "undefined") {
+  class ServerSocket {
+    close() {}
+    send() {}
+    addEventListener() {}
+    removeEventListener() {}
+  }
+  globalThis.WebSocket = ServerSocket as unknown as typeof WebSocket;
+}
+
 const url = import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
 const key = import.meta.env["VITE_SUPABASE_ANON_KEY"] as string | undefined;
 

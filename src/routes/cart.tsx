@@ -26,7 +26,7 @@ function CartPage() {
   const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
       <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
       <div className="mx-auto max-w-3xl">
         <div className="flex items-start justify-between gap-3">

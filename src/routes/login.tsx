@@ -40,7 +40,12 @@ function LoginPage() {
       <form onSubmit={submit} className="space-y-4">
         <div><Label htmlFor="u" className="text-foreground">Email / Gmail</Label><Input id="u" required autoComplete="email" value={login} onChange={(e) => setLogin(e.target.value)} className="mt-1 h-11" /></div>
         <div><Label htmlFor="pw" className="text-foreground">Password</Label><Input id="pw" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
-        <p className="text-sm text-muted-foreground">Your <strong className="text-foreground">name</strong> and <strong className="text-foreground">mobile number</strong> are saved on the account. Sign in here with your email / Gmail and password.</p>
+        <div className="rounded-2xl bg-rose-50 p-3 text-sm text-rose-950">
+          <p className="font-semibold">Use these account details</p>
+          <p className="mt-1">Email / Gmail — the field above</p>
+          <p>Name — saved when you created the account</p>
+          <p>Mobile number — saved when you created the account</p>
+        </div>
         <Button disabled={busy} className="h-12 w-full rounded-full">{busy ? "Signing in…" : "Sign in"}</Button>
       </form>
       <p className="mt-6 text-center text-sm text-muted-foreground">New here? <Link to="/signup" className="font-semibold text-primary">Create an account</Link></p>

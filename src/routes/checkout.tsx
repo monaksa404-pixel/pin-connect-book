@@ -42,7 +42,7 @@ function Checkout() {
   const [method, setMethod] = useState<"bank" | "wallet" | "card">("bank");
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("checkout-draft");
+    const raw = localStorage.getItem("checkout-draft");
     if (raw) {
       try {
         const d = JSON.parse(raw) as { name?: string; phone?: string; city?: string; notes?: string };
@@ -63,7 +63,7 @@ function Checkout() {
 
   useEffect(() => {
     if (!ready) return;
-    sessionStorage.setItem("checkout-draft", JSON.stringify({ name, phone, city, notes }));
+    localStorage.setItem("checkout-draft", JSON.stringify({ name, phone, city, notes }));
   }, [name, phone, city, notes, ready]);
 
   if (!lines.length || !slot)
@@ -104,13 +104,13 @@ function Checkout() {
       `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
     clear();
-    sessionStorage.removeItem("checkout-draft");
+    localStorage.removeItem("checkout-draft");
     toast.success(`Booking ${data.code} submitted. Remaining to pay at the salon: ${sar(remaining)}`);
     navigate({ to: "/my-bookings" });
   };
 
   const shell = (title: string, step: string, body: ReactNode) => (
-    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
       <div className="mx-auto max-w-3xl">
         <p className="text-xs font-semibold tracking-widest text-rose-400">{step}</p>
         <h1 className="font-display text-4xl font-semibold text-rose-950">{title}</h1>

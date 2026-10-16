@@ -39,8 +39,8 @@ function AdminGate() {
 
 function Admin() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50 to-background">
-      <header className="border-b border-rose-100 bg-white">
+    <div className="min-h-screen bg-[#ffd6e8]">
+      <header className="border-b border-rose-200 bg-[#ffe4f0]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <h1 className="font-display text-2xl font-semibold text-rose-700">The Beauty House · Admin</h1>
           <Button asChild variant="ghost" size="sm"><Link to="/"><ArrowLeft className="mr-1 h-4 w-4" />Back to site</Link></Button>

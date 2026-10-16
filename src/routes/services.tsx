@@ -65,7 +65,7 @@ function ServicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
       <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
       <div className="mx-auto max-w-6xl">
         <h1 className="font-display text-4xl font-semibold text-rose-950">Our Services</h1>
@@ -76,8 +76,8 @@ function ServicesPage() {
         </label>
         <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
           {ICONS.map((c) => (
-            <Link key={c.label} to="/services" search={c.category ? { category: c.category } : {}} className="flex w-[72px] shrink-0 flex-col items-center gap-2 text-center text-[11px] font-semibold text-rose-950">
-              <span className={`grid h-14 w-14 place-items-center rounded-2xl shadow-sm ${active === c.category || (!active && c.label === "All") ? "bg-rose-600 text-white" : "bg-white text-rose-600"}`}>
+            <Link key={c.label} to="/services" search={c.category ? { category: c.category } : {}} className="flex w-[76px] shrink-0 flex-col items-center gap-2 text-center text-[11px] font-semibold text-rose-950">
+              <span className={`grid h-16 w-16 place-items-center rounded-2xl shadow-sm ${active === c.category || (!active && c.label === "All") ? "bg-rose-600 text-white" : "border border-rose-100 bg-white text-rose-600"}`}>
                 <c.icon className="h-6 w-6" />
               </span>
               {c.label}

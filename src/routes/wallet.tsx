@@ -82,7 +82,7 @@ function WalletPage() {
   const balance = Number(profile?.wallet_balance ?? 0);
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
       <div className="mx-auto max-w-3xl">
         <h1 className="font-display text-4xl font-semibold text-rose-950">Wallet</h1>
         <p className="text-rose-900/60">Manage your balance and payments</p>

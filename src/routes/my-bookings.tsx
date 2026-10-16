@@ -86,7 +86,7 @@ function MyBookings() {
   });
   return (
     <>
-      <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+      <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
         <div className="mx-auto max-w-3xl">
           <p className="text-xs font-semibold tracking-widest text-rose-400">ACCOUNT</p>
           <h1 className="font-display text-4xl font-semibold text-rose-950">My <span className="text-rose-600">Bookings</span></h1>

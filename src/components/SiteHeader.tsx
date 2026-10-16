@@ -37,7 +37,7 @@ export function SiteHeader() {
   });
 
   return (
-    <header className="sticky top-0 z-40 border-b border-rose-100 bg-[#fff5f8]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-rose-200 bg-[#ffd6e8]/95 backdrop-blur-md">
       <div className="mx-auto grid h-16 max-w-6xl grid-cols-[auto_1fr_auto] items-center px-3 md:flex md:justify-between md:px-4">
         <button className="rounded-full p-2 text-rose-700 md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

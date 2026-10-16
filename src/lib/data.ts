@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   salon_name: "The Beauty House",
   tagline: "Men's salon",
   bank_name: "Al Rajhi Bank",
-  account_holder: "Maison Rose Salon",
+  account_holder: "The Beauty House Salon",
   account_number: "000000000000",
   iban: "SA0000000000000000000000",
   bank_qr_url: null,
@@ -78,6 +78,18 @@ export const settingsQuery = queryOptions({
     const { data, error } = await supabase.from("settings").select("*").eq("id", 1).maybeSingle();
     if (error || !data) return DEFAULT_SETTINGS;
     return data as Settings;
+  },
+});
+
+export type HomeSlide = { id: string; image_url: string; service_id: string | null };
+
+export const slidersQuery = queryOptions({
+  queryKey: ["homepage-sliders"],
+  queryFn: async (): Promise<HomeSlide[]> => {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from("homepage_sliders").select("id, image_url, service_id").eq("active", true).order("sort");
+    if (error || !data?.length) return [];
+    return data as HomeSlide[];
   },
 });
 

@@ -57,7 +57,7 @@ function BookPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
       <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
       <div className="mx-auto max-w-4xl rounded-[28px] bg-white p-4 shadow-sm md:p-6">
         <h1 className="font-display text-3xl font-semibold text-rose-950">Choose <span className="text-rose-600">Date & Time</span></h1>

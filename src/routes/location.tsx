@@ -40,7 +40,7 @@ function LocationPage() {
   const shown = whatsapp ? `+${whatsapp}` : "";
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] px-4 pb-28 pt-4 md:pb-10">
+    <div className="min-h-screen bg-[#ffd6e8] px-4 pb-28 pt-4 md:pb-10">
       <div className="mx-auto max-w-3xl space-y-4">
         <div className="flex items-start gap-3">
           <span className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-600 text-white"><MapPin className="h-5 w-5" /></span>
