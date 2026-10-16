@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Clock, Minus, Plus, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
-import { CATEGORIES, sar, serviceImage, servicesQuery } from "@/lib/data";
+import { CATEGORIES, DEFAULT_SETTINGS, sar, serviceImage, servicesQuery, settingsQuery } from "@/lib/data";
 import { useCart } from "@/lib/cart";
 import { PageHeader, Steps } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { FullNotice } from "@/components/FullNotice";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/services")({
@@ -14,9 +16,9 @@ export const Route = createFileRoute("/services")({
   }),
   head: () => ({
     meta: [
-      { title: "Services & Prices — Maison Rosé" },
+      { title: "Services & Prices — The Beauty House" },
       { name: "description", content: "Haircuts, beard, facial and massage services with prices in SAR." },
-      { property: "og:title", content: "Services & Prices — Maison Rosé" },
+      { property: "og:title", content: "Services & Prices — The Beauty House" },
       { property: "og:description", content: "Browse salon services and add them to your booking." },
     ],
   }),
@@ -27,6 +29,13 @@ function ServicesPage() {
   const { category } = Route.useSearch();
   const { data: services = [], isLoading } = useQuery(servicesQuery);
   const { lines, add, setQty, count, total } = useCart();
+  const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
+  const [fullOpen, setFullOpen] = useState(false);
+  const addService = (s: (typeof services)[number]) => {
+    if (settings.bookings_full) { setFullOpen(true); return; }
+    add(s);
+    toast.success(`${s.name} added`);
+  };
   const active = category ?? "All";
   const list = active === "All" ? services : services.filter((s) => s.category === active);
 
@@ -34,6 +43,7 @@ function ServicesPage() {
     <>
       <PageHeader eyebrow="Menu" title="Services & prices">Pick one or more services, then continue to your cart.</PageHeader>
       <div className="mx-auto max-w-6xl px-4 py-10 pb-32">
+        <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
         <Steps current={0} />
         <div className="mb-8 flex gap-2 overflow-x-auto pb-1">
           {["All", ...CATEGORIES].map((c) => (
@@ -69,7 +79,7 @@ function ServicesPage() {
                         <p className="flex items-center gap-1 text-xs text-muted-foreground"><Clock className="h-3 w-3" />{s.duration_min} min</p>
                       </div>
                       {qty === 0 ? (
-                        <Button className="rounded-full" onClick={() => { add(s); toast.success(`${s.name} added`); }}>Add to cart</Button>
+                        <Button className="rounded-full" onClick={() => addService(s)}>Add to cart</Button>
                       ) : (
                         <div className="flex items-center gap-2 rounded-full border border-border p-1">
                           <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => setQty(s.id, qty - 1)} aria-label="Decrease"><Minus className="h-4 w-4" /></Button>

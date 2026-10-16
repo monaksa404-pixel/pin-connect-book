@@ -13,13 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { FullNotice } from "@/components/FullNotice";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
     meta: [
-      { title: "Details & Payment — Maison Rosé" },
+      { title: "Details & Payment — The Beauty House" },
       { name: "description", content: "Enter your details and pay the advance to confirm your booking." },
-      { property: "og:title", content: "Details & Payment — Maison Rosé" },
+      { property: "og:title", content: "Details & Payment — The Beauty House" },
       { property: "og:description", content: "Confirm your salon booking." },
     ],
   }),
@@ -35,18 +36,43 @@ function Checkout() {
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [notes, setNotes] = useState("");
+  const [ready, setReady] = useState(false);
+  const [fullOpen, setFullOpen] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    const raw = sessionStorage.getItem("checkout-draft");
+    if (raw) {
+      try {
+        const d = JSON.parse(raw) as { name?: string; phone?: string; city?: string; notes?: string };
+        setName(d.name ?? "");
+        setPhone(d.phone ?? "");
+        setCity(d.city ?? "");
+        setNotes(d.notes ?? "");
+        setReady(true);
+        return;
+      } catch { /* ignore */ }
+    }
+    if (!user) { setReady(true); return; }
     supabase.from("profiles").select("full_name, phone, city").eq("id", user.id).maybeSingle().then(({ data }) => {
       if (data) { setName(data.full_name ?? ""); setPhone(data.phone ?? ""); setCity(data.city ?? ""); }
+      setReady(true);
     });
   }, [user]);
+
+  useEffect(() => {
+    if (!ready) return;
+    sessionStorage.setItem("checkout-draft", JSON.stringify({ name, phone, city, notes }));
+  }, [name, phone, city, notes, ready]);
 
   if (!lines.length || !slot)
     return <div className="mx-auto max-w-xl px-4 py-16"><EmptyState title="Nothing to book yet"><Button asChild className="mt-4 rounded-full"><Link to="/services">Browse services</Link></Button></EmptyState></div>;
   if (settings.bookings_full)
-    return <div className="mx-auto max-w-xl px-4 py-16"><EmptyState title="Bookings unavailable">{settings.full_message}</EmptyState></div>;
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16">
+        <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
+        {!fullOpen && <EmptyState title="Bookings unavailable">{settings.full_message}</EmptyState>}
+      </div>
+    );
 
   const { advance, remaining } = advanceFor(total, settings.advance_percent);
 
@@ -76,7 +102,8 @@ function Checkout() {
       `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
     clear();
-    toast.success(`Booking ${data.code} submitted!`);
+    sessionStorage.removeItem("checkout-draft");
+    toast.success(`Booking ${data.code} submitted. Remaining to pay at the salon: ${sar(remaining)}`);
     navigate({ to: "/my-bookings" });
   };
 

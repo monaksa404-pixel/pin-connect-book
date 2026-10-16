@@ -36,10 +36,11 @@ function LoginPage() {
   };
 
   return (
-    <AuthCard title="Sign in" sub="Use the email and password from your account.">
+    <AuthCard title="Sign in" sub="Use the same email, name, and mobile number from your account.">
       <form onSubmit={submit} className="space-y-4">
-        <div><Label htmlFor="u">Email</Label><Input id="u" required value={login} onChange={(e) => setLogin(e.target.value)} className="mt-1 h-11" /></div>
-        <div><Label htmlFor="pw">Password</Label><Input id="pw" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
+        <div><Label htmlFor="u" className="text-foreground">Email / Gmail</Label><Input id="u" required autoComplete="email" value={login} onChange={(e) => setLogin(e.target.value)} className="mt-1 h-11" /></div>
+        <div><Label htmlFor="pw" className="text-foreground">Password</Label><Input id="pw" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
+        <p className="text-sm text-muted-foreground">Your <strong className="text-foreground">name</strong> and <strong className="text-foreground">mobile number</strong> are saved on the account. Sign in here with your email / Gmail and password.</p>
         <Button disabled={busy} className="h-12 w-full rounded-full">{busy ? "Signing in…" : "Sign in"}</Button>
       </form>
       <p className="mt-6 text-center text-sm text-muted-foreground">New here? <Link to="/signup" className="font-semibold text-primary">Create an account</Link></p>

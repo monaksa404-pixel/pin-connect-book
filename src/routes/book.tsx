@@ -1,20 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, startOfToday } from "date-fns";
 import { useCart } from "@/lib/cart";
 import { DEFAULT_SETTINGS, fmtTime, settingsQuery, timeSlots } from "@/lib/data";
 import { EmptyState, PageHeader, Steps } from "@/components/shared";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
+import { FullNotice } from "@/components/FullNotice";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/book")({
   head: () => ({
     meta: [
-      { title: "Choose Date & Time — Maison Rosé" },
+      { title: "Choose Date & Time — The Beauty House" },
       { name: "description", content: "Pick a date and time for your salon appointment." },
-      { property: "og:title", content: "Choose Date & Time — Maison Rosé" },
+      { property: "og:title", content: "Choose Date & Time — The Beauty House" },
       { property: "og:description", content: "Pick a date and time for your salon appointment." },
     ],
   }),
@@ -27,6 +28,8 @@ function BookPage() {
   const navigate = useNavigate();
   const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : undefined);
   const [time, setTime] = useState<string | null>(slot?.time ?? null);
+  const [fullOpen, setFullOpen] = useState(false);
+  useEffect(() => { if (settings.bookings_full) setFullOpen(true); }, [settings.bookings_full]);
 
   const slots = useMemo(() => {
     const all = timeSlots(settings.open_time.slice(0, 5), settings.close_time.slice(0, 5), settings.slot_minutes);
@@ -47,6 +50,7 @@ function BookPage() {
     );
 
   const next = () => {
+    if (settings.bookings_full) { setFullOpen(true); return; }
     if (!date || !time) return;
     setSlot({ date: format(date, "yyyy-MM-dd"), time });
     navigate({ to: "/checkout" });
@@ -57,7 +61,7 @@ function BookPage() {
       <PageHeader eyebrow="Step 3" title="Date & time" />
       <div className="mx-auto max-w-5xl px-4 py-10">
         <Steps current={2} />
-        {settings.bookings_full && <p className="mb-6 rounded-2xl bg-destructive/10 p-4 text-center text-destructive">{settings.full_message}</p>}
+        <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
         <div className="grid gap-6 md:grid-cols-[auto_1fr]">
           <div className="rounded-3xl border border-border bg-card p-3 shadow-soft">
             <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={{ before: startOfToday() }} />
@@ -84,7 +88,7 @@ function BookPage() {
           </div>
         </div>
         <div className="mt-6 flex justify-end">
-          <Button disabled={!date || !time || settings.bookings_full} onClick={next} className="h-12 rounded-full px-8">Continue</Button>
+          <Button disabled={!date || !time} onClick={next} className="h-12 rounded-full px-8">Continue</Button>
         </div>
       </div>
     </>

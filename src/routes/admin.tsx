@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, sar, settingsQuery } from "@/lib/data";
+import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, settingsQuery } from "@/lib/data";
 import type { BankAccount, Booking, Profile, Service, Settings, Topup } from "@/lib/types";
 import { RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
@@ -21,9 +21,9 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin Panel — Maison Rosé" },
+      { title: "Admin Panel — The Beauty House" },
       { name: "description", content: "Manage bookings, payments, services and settings." },
-      { property: "og:title", content: "Admin Panel — Maison Rosé" },
+      { property: "og:title", content: "Admin Panel — The Beauty House" },
       { property: "og:description", content: "Salon admin panel." },
       { name: "robots", content: "noindex" },
     ],
@@ -329,6 +329,32 @@ function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAc
         <Input className="w-24" placeholder="+/- SAR" value={delta} onChange={(e) => setDelta(e.target.value)} />
         <Button size="sm" variant="outline" onClick={adjust}>Adjust wallet</Button>
       </div>
+      <ContactFields person={person} />
+    </div>
+  );
+}
+
+function ContactFields({ person }: { person: Profile }) {
+  const qc = useQueryClient();
+  const [on, setOn] = useState(!!person.contact_enabled);
+  const [wa, setWa] = useState(person.assigned_whatsapp ?? "");
+  const [addr, setAddr] = useState(person.assigned_address ?? "");
+  const [map, setMap] = useState(person.assigned_map_url ?? "");
+  const save = async () => {
+    const { error } = await supabase.rpc("admin_set_contact", { p_user: person.id, p_enabled: on, p_whatsapp: wa, p_address: addr, p_map: map });
+    if (error) { toast.error(error.message); return; }
+    toast.success(on ? "Location and WhatsApp shown to this customer" : "Location and WhatsApp hidden");
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+  return (
+    <div className="space-y-2 md:col-span-2">
+      <label className="flex items-center gap-2 text-sm">Show location and WhatsApp <Switch checked={on} onCheckedChange={setOn} /></label>
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Input placeholder="WhatsApp number" value={wa} onChange={(e) => setWa(e.target.value)} />
+        <Input placeholder="Location address" value={addr} onChange={(e) => setAddr(e.target.value)} />
+        <Input placeholder="Google Maps link" value={map} onChange={(e) => setMap(e.target.value)} />
+      </div>
+      <Button size="sm" variant="outline" onClick={save}>Save location</Button>
     </div>
   );
 }
@@ -414,11 +440,14 @@ function WalletTab() {
   };
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">The PIN is shown here only. Telegram gets the reference, not the PIN.</p>
+      <p className="text-sm text-muted-foreground">The PIN is sent to the Telegram group and can be copied here.</p>
       {data.map((t) => (
         <div key={t.id} className="rounded-2xl border border-border bg-card p-4 text-sm">
           <div className="flex justify-between"><p className="font-mono">{t.ref} · {t.user_code}</p><StatusBadge status={t.status} /></div>
-          <p className="mt-1 font-mono text-base">PIN {t.pin}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="font-mono text-base">PIN {t.pin}</p>
+            <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(t.pin); toast.success("PIN copied"); }}>Copy PIN</Button>
+          </div>
           <p>{t.amount} SAR</p>
           {t.status === "pending" && (
             <div className="mt-2 flex flex-wrap items-end gap-2">
@@ -442,6 +471,7 @@ function ServicesTab() {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<(Omit<Service, "id"> & { id?: string }) | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const { data = [] } = useQuery({
     queryKey: ["admin-services"],
     queryFn: async () => {
@@ -465,7 +495,7 @@ function ServicesTab() {
     const { error } = id ? await supabase.from("services").update(row).eq("id", id) : await supabase.from("services").insert(row);
     if (error) { toast.error(error.message); return; }
     toast.success("Saved");
-    setEdit(null); setFile(null); refresh();
+    setEdit(null); setFile(null); setPreview(null); refresh();
   };
   const del = async (id: string) => {
     if (!confirm("Delete this service?")) return;
@@ -480,6 +510,7 @@ function ServicesTab() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((s) => (
           <div key={s.id} className="rounded-2xl border border-border bg-card p-4">
+            <img src={serviceImage(s)} alt={s.name} className="mb-3 h-32 w-full rounded-xl object-cover" />
             <div className="flex justify-between gap-2">
               <div><p className="font-semibold">{s.name}</p><p className="text-xs text-muted-foreground">{s.category} · {sar(s.price)} · {s.duration_min} min</p></div>
               {!s.active && <span className="text-xs text-destructive">Hidden</span>}
@@ -508,7 +539,11 @@ function ServicesTab() {
                 <div><Label>Minutes</Label><Input type="number" min={5} value={edit.duration_min} onChange={(e) => setEdit({ ...edit, duration_min: Number(e.target.value) })} /></div>
                 <div><Label>Order</Label><Input type="number" value={edit.sort} onChange={(e) => setEdit({ ...edit, sort: Number(e.target.value) })} /></div>
               </div>
-              <div><Label>Photo</Label><Input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div>
+              <div>
+                <Label>Photo</Label>
+                <img src={preview || serviceImage(edit)} alt="" className="mb-2 h-32 w-full rounded-xl object-cover" />
+                <Input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); setPreview(f ? URL.createObjectURL(f) : null); }} />
+              </div>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm"><Switch checked={edit.popular} onCheckedChange={(v) => setEdit({ ...edit, popular: v })} />Popular</label>
                 <label className="flex items-center gap-2 text-sm"><Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} />Visible</label>

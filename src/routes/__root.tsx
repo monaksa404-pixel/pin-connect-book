@@ -87,7 +87,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "The Beauty House Salon" },
       { name: "description", content: "Book haircuts, beard, facial and massage services online." },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "The Beauty House Salon" },
+      { property: "og:title", content: "The Beauty House Salon" },
+      { property: "og:description", content: "Book haircuts, beard, facial and massage at The Beauty House Salon." },
+      { property: "og:image", content: "/images/logo.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "/images/logo.png" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

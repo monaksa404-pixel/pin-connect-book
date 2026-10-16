@@ -77,6 +77,10 @@ export type Profile = {
   allow_bank: boolean;
   allow_wallet: boolean;
   bank_account_id: string | null;
+  assigned_whatsapp: string | null;
+  assigned_address: string | null;
+  assigned_map_url: string | null;
+  contact_enabled: boolean;
   created_at: string;
 };
 

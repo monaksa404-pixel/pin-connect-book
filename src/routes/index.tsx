@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Clock, MapPin, Sparkles, Star, ShieldCheck, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FullNotice } from "@/components/FullNotice";
 import { CATEGORIES, categoryImage, fmtTime, sar, serviceImage, servicesQuery, settingsQuery, DEFAULT_SETTINGS } from "@/lib/data";
 import { useCart } from "@/lib/cart";
 import { toast } from "sonner";
@@ -11,7 +13,7 @@ export const Route = createFileRoute("/")({
     meta: [
       { title: "The Beauty House Salon" },
       { name: "description", content: "Book haircuts, beard, facial and massage at The Beauty House." },
-      { property: "og:title", content: "Maison Rosé — Luxury Salon Booking" },
+      { property: "og:title", content: "The Beauty House — Luxury Salon Booking" },
       { property: "og:description", content: "Book haircuts, beard, facial and massage services online." },
     ],
   }),
@@ -22,6 +24,7 @@ function Index() {
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
   const { data: services = [] } = useQuery(servicesQuery);
   const { add } = useCart();
+  const [fullOpen, setFullOpen] = useState(false);
   const popular = services.filter((s) => s.popular).slice(0, 6);
 
   return (
@@ -38,9 +41,7 @@ function Index() {
             <span className="rounded-full bg-white/80 px-3 py-2">Expert stylists</span>
             <span className="rounded-full bg-white/80 px-3 py-2">Clean and hygienic</span>
           </div>
-          {settings.bookings_full && (
-            <p className="mx-auto mt-4 max-w-lg rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{settings.full_message}</p>
-          )}
+          <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
           <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
             {CATEGORIES.map((c) => (
               <Link key={c} to="/services" search={{ category: c }} className="overflow-hidden rounded-3xl border border-rose-200 bg-neutral-950 text-white shadow-soft">
@@ -53,7 +54,11 @@ function Index() {
             <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-rose-600" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)} daily</span>
             <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-rose-600" />{settings.address}</span>
           </div>
-          <Button asChild className="mt-8 h-12 rounded-full bg-rose-600 px-10 hover:bg-rose-700"><Link to="/services">Book now</Link></Button>
+          {settings.bookings_full ? (
+            <Button className="mt-8 h-12 rounded-full bg-rose-600 px-10 hover:bg-rose-700" onClick={() => setFullOpen(true)}>Book now</Button>
+          ) : (
+            <Button asChild className="mt-8 h-12 rounded-full bg-rose-600 px-10 hover:bg-rose-700"><Link to="/services">Book now</Link></Button>
+          )}
         </div>
       </section>
 
@@ -75,7 +80,7 @@ function Index() {
                   <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{s.description}</p>
                   <div className="mt-4 flex items-center justify-between">
                     <span className="font-semibold">{sar(s.price)} <span className="text-xs font-normal text-muted-foreground">· {s.duration_min} min</span></span>
-                    <Button size="sm" className="rounded-full" onClick={() => { add(s); toast.success(`${s.name} added to cart`); }}>Add</Button>
+                    <Button size="sm" className="rounded-full" onClick={() => { if (settings.bookings_full) { setFullOpen(true); return; } add(s); toast.success(`${s.name} added to cart`); }}>Add</Button>
                   </div>
                 </div>
               </div>

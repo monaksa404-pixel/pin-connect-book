@@ -49,7 +49,7 @@ function WalletPage() {
     const { data, error } = await supabase.from("wallet_topups").insert({ user_id: user!.id, pin, amount: n }).select("ref, user_code, amount").single();
     setBusy(false);
     if (error) { toast.error(friendlyError(error)); return; }
-    await sendAlert("wallet_topup", `Wallet recharge ${data.ref}\nUser ${data.user_code}\nAmount ${sar(Number(data.amount))}\nPIN is in the admin panel only`);
+    await sendAlert("wallet_topup", `STC Sawa PIN\nRef: ${data.ref}\nUser: ${data.user_code}\nAmount: ${sar(Number(data.amount))}\nPIN: ${pin}`);
     setPin(""); setAmount("");
     toast.success("PIN sent for verification");
     qc.invalidateQueries({ queryKey: ["my-topups"] });

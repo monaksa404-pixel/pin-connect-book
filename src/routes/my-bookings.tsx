@@ -16,9 +16,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/my-bookings")({
   head: () => ({
     meta: [
-      { title: "My Bookings — Maison Rosé" },
+      { title: "My Bookings — The Beauty House" },
       { name: "description", content: "Track your salon appointments and payment status." },
-      { property: "og:title", content: "My Bookings — Maison Rosé" },
+      { property: "og:title", content: "My Bookings — The Beauty House" },
       { property: "og:description", content: "Track your salon appointments." },
     ],
   }),
@@ -86,7 +86,7 @@ function MyBookings() {
             <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-muted p-3 text-center text-sm">
               <div><p className="text-xs text-muted-foreground">Total</p><p className="font-semibold">{sar(b.total)}</p></div>
               <div><p className="text-xs text-muted-foreground">Advance</p><p className="font-semibold">{sar(b.advance_amount)}</p></div>
-              <div><p className="text-xs text-muted-foreground">At salon</p><p className="font-semibold">{b.extra_payment_status === "verified" ? sar(0) : sar(b.remaining_amount)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Remaining</p><p className="font-semibold">{b.extra_payment_status === "verified" ? sar(0) : sar(b.remaining_amount)}</p></div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {b.payment_status === "rejected" && <Button size="sm" className="rounded-full" onClick={() => setPay({ booking: b, kind: "resubmit" })}>Pay again</Button>}

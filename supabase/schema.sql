@@ -687,6 +687,24 @@ returns text language sql stable security definer set search_path = public as $$
 $$;
 grant execute on function public.email_for_login(text) to anon, authenticated;
 
+alter table public.profiles add column if not exists assigned_whatsapp text;
+alter table public.profiles add column if not exists assigned_address text;
+alter table public.profiles add column if not exists assigned_map_url text;
+alter table public.profiles add column if not exists contact_enabled boolean not null default false;
+
+create or replace function public.admin_set_contact(p_user uuid, p_enabled boolean, p_whatsapp text, p_address text, p_map text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  update public.profiles set
+    contact_enabled = coalesce(p_enabled, false),
+    assigned_whatsapp = nullif(trim(p_whatsapp), ''),
+    assigned_address = nullif(trim(p_address), ''),
+    assigned_map_url = nullif(trim(p_map), '')
+  where id = p_user;
+end $$;
+grant execute on function public.admin_set_contact(uuid, boolean, text, text, text) to authenticated;
+
 do $$ begin
   alter publication supabase_realtime add table public.wallet_topups;
 exception when others then null; end $$;

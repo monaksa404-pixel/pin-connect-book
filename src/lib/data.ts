@@ -15,8 +15,12 @@ export const categoryImage: Record<string, string> = {
   Massage: hero,
 };
 
-export const serviceImage = (s: Pick<Service, "image_url" | "category">) =>
-  s.image_url || categoryImage[s.category] || hero;
+export const serviceImage = (s: Pick<Service, "image_url" | "category">) => {
+  const u = s.image_url?.trim();
+  if (!u) return categoryImage[s.category] || hero;
+  if (u.startsWith("http") || u.startsWith("/") || u.startsWith("data:") || u.startsWith("blob:")) return u;
+  return supabase.storage.from("media").getPublicUrl(u).data.publicUrl || categoryImage[s.category] || hero;
+};
 
 export const DEFAULT_SETTINGS: Settings = {
   salon_name: "The Beauty House",

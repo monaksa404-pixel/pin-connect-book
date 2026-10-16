@@ -1,17 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { advanceFor, DEFAULT_SETTINGS, sar, serviceImage, settingsQuery } from "@/lib/data";
 import { EmptyState, PageHeader, Steps } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { FullNotice } from "@/components/FullNotice";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
     meta: [
-      { title: "Your Cart — Maison Rosé" },
+      { title: "Your Cart — The Beauty House" },
       { name: "description", content: "Review your selected salon services before booking." },
-      { property: "og:title", content: "Your Cart — Maison Rosé" },
+      { property: "og:title", content: "Your Cart — The Beauty House" },
       { property: "og:description", content: "Review your selected salon services before booking." },
     ],
   }),
@@ -22,6 +24,7 @@ function CartPage() {
   const { lines, setQty, remove, total } = useCart();
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
   const { advance, remaining } = advanceFor(total, settings.advance_percent);
+  const [fullOpen, setFullOpen] = useState(false);
 
   return (
     <>
@@ -57,9 +60,10 @@ function CartPage() {
             <aside className="h-fit space-y-3 rounded-3xl border border-border bg-card p-6 shadow-soft">
               <Row k="Total" v={sar(total)} bold />
               <Row k={`Pay now (${settings.advance_percent}%)`} v={sar(advance)} />
-              <Row k="Pay at salon (cash)" v={sar(remaining)} />
+              <Row k="Remaining" v={sar(remaining)} />
+              <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
               {settings.bookings_full ? (
-                <p className="rounded-2xl bg-destructive/10 p-3 text-sm text-destructive">{settings.full_message}</p>
+                <Button className="h-12 w-full rounded-full" onClick={() => setFullOpen(true)}>Choose date & time</Button>
               ) : (
                 <Button asChild className="h-12 w-full rounded-full"><Link to="/book">Choose date & time</Link></Button>
               )}
