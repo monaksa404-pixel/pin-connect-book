@@ -125,6 +125,7 @@ export function ksaNow(d = new Date()) {
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
   let hour = Number(get("hour"));
   if (hour === 24) hour = 0;
+  const minute = Number(get("minute"));
   return { date: `${get("year")}-${get("month")}-${get("day")}`, hour, minute };
 }
 
