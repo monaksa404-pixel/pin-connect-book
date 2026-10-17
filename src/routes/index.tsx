@@ -43,7 +43,7 @@ function Index() {
   const { add } = useCart();
   const [fullOpen, setFullOpen] = useState(false);
   const [slide, setSlide] = useState(0);
-  const popular = (services.filter((s) => s.popular).length ? services.filter((s) => s.popular) : services).slice(0, 4);
+  const popular = services;
 
   const slides = dbSlides.length
     ? dbSlides.map((s) => ({ src: mediaUrl(s.image_url), serviceId: s.service_id, key: s.id }))
@@ -92,36 +92,33 @@ function Index() {
         </div>
 
         <div className="mt-6 flex items-end justify-between">
-          <h2 className="font-display text-2xl font-semibold text-[#5c2344] sm:text-3xl">Most Popular Services</h2>
+          <h2 className="font-display text-2xl font-semibold text-[#5c2344] sm:text-3xl">Our Services</h2>
           <Link to="/services" className="text-sm font-semibold text-[#ff4d94]">View All &gt;</Link>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {popular.map((s) => (
-            <article key={s.id} className="overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-sm">
+            <article key={s.id} className="overflow-hidden">
               <div className="relative">
-                <img src={serviceImage(s)} alt={s.name} className="aspect-[4/3] w-full object-cover" />
-                {s.popular && <span className="absolute left-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-red-600">HOT <Flame className="h-3 w-3 fill-red-600 text-red-600" /></span>}
-                <span className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-[#ff4d94]"><Heart className="h-4 w-4" /></span>
+                <img src={serviceImage(s)} alt={s.name} className="aspect-[4/3] w-full rounded-2xl object-cover" />
+                <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-[#ff4d94]"><Heart className="h-3.5 w-3.5" /></span>
+                {s.popular && <span className="absolute left-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">HOT <Flame className="h-3 w-3 fill-white text-white" /></span>}
               </div>
-              <div className="p-3">
-                <h3 className="font-semibold leading-tight text-[#5c2344]">{s.name}</h3>
-                <p className="mt-1 line-clamp-2 text-xs text-[#9a5b78]">{s.description}</p>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[11px] text-[#9a5b78]"><Clock className="h-3.5 w-3.5" />{s.duration_min} min</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (settings.bookings_full) { setFullOpen(true); return; }
-                      add(s);
-                      toast.success(`${s.name} added to cart`);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full bg-[#ff4d94] px-2.5 py-1.5 text-[11px] font-semibold text-white"
-                  >
-                    <ShoppingCart className="h-3.5 w-3.5" /> Add to Cart
-                  </button>
-                </div>
-                <p className="mt-2 text-xs font-semibold text-[#e23b86]">{sar(s.price)}</p>
+              <h3 className="mt-2 text-base font-semibold text-[#3d2030] md:text-lg">{s.name}</h3>
+              <div className="mt-1 flex items-center justify-between text-sm font-semibold">
+                <span className="text-[#ff4d94]">{sar(s.price)}</span>
+                <span className="flex items-center gap-1 text-[#9a5b78]"><Clock className="h-4 w-4 text-[#ff4d94]" />{s.duration_min} min</span>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (settings.bookings_full) { setFullOpen(true); return; }
+                  add(s);
+                  toast.success(`${s.name} added to cart`);
+                }}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ff4d94] py-2.5 text-sm font-semibold text-white"
+              >
+                <ShoppingCart className="h-4 w-4" /> Add to Cart
+              </button>
             </article>
           ))}
         </div>

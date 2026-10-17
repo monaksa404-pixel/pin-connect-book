@@ -112,6 +112,22 @@ export const servicesQuery = queryOptions({
 
 export const sar = (n: number) => `${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })} SAR`;
 
+export function ksaNow(d = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  let hour = Number(get("hour"));
+  if (hour === 24) hour = 0;
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, hour, minute };
+}
+
 export function timeSlots(open: string, close: string, step: number): string[] {
   const toMin = (t: string) => {
     const [h = 0, m = 0] = t.split(":").map(Number);

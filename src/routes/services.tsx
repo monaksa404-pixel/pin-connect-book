@@ -103,7 +103,7 @@ function ServicesPage() {
                     <div className="relative">
                       <img src={serviceImage(s)} alt={s.name} className="aspect-[4/3] w-full rounded-2xl object-cover" />
                       <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-[#ff4d94]"><Heart className="h-3.5 w-3.5" /></span>
-                      {s.popular && <span className="absolute left-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-red-600">HOT <Flame className="h-3 w-3 fill-red-600 text-red-600" /></span>}
+                      {s.popular && <span className="absolute left-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">HOT <Flame className="h-3 w-3 fill-white text-white" /></span>}
                     </div>
                     <h3 className="mt-2 text-base font-semibold text-[#3d2030] md:text-lg">{s.name}</h3>
                     <div className="mt-1 flex items-center justify-between text-sm font-semibold">

@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { format, startOfToday } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { CalendarDays, Clock, Flower2, Gift, MapPin, Minus, Plus, Scissors, ShoppingCart, Smile, Trash2, UserRound } from "lucide-react";
 import { useCart } from "@/lib/cart";
-import { advanceFor, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, servicesQuery, settingsQuery, timeSlots } from "@/lib/data";
+import { advanceFor, DEFAULT_SETTINGS, fmtTime, ksaNow, sar, serviceImage, servicesQuery, settingsQuery, timeSlots } from "@/lib/data";
 import { FullNotice } from "@/components/FullNotice";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -38,16 +38,16 @@ function CartPage() {
   const [dateOpen, setDateOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : new Date());
   const [time, setTime] = useState<string | null>(slot?.time ?? null);
+  const ksa = ksaNow();
   const slots = useMemo(() => {
     const all = timeSlots(settings.open_time.slice(0, 5), settings.close_time.slice(0, 5), settings.slot_minutes);
-    if (!date || format(date, "yyyy-MM-dd") !== format(new Date(), "yyyy-MM-dd")) return all;
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
+    if (!date || format(date, "yyyy-MM-dd") !== ksa.date) return all;
+    const nowMin = ksa.hour * 60 + ksa.minute;
     return all.filter((t) => {
       const [h = 0, m = 0] = t.split(":").map(Number);
       return h * 60 + m > nowMin;
     });
-  }, [date, settings]);
+  }, [date, settings, ksa.date, ksa.hour, ksa.minute]);
   const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
@@ -68,7 +68,7 @@ function CartPage() {
             <p className="text-[#9a5b78]">Review your selected services</p>
           </div>
           {lines.length > 0 && (
-            <button type="button" onClick={clear} className="inline-flex items-center gap-1 rounded-full border border-pink-200 bg-white px-3 py-2 text-sm font-semibold text-[#e23b86]">
+            <button type="button" onClick={clear} className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600">
               <Trash2 className="h-4 w-4" /> Clear Cart
             </button>
           )}
@@ -89,7 +89,7 @@ function CartPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between gap-2">
                       <p className="font-semibold text-[#3d2030]">{s.name}</p>
-                      <button type="button" onClick={() => remove(s.id)} aria-label="Remove"><Trash2 className="h-4 w-4 text-pink-300" /></button>
+                      <button type="button" onClick={() => remove(s.id)} aria-label="Remove"><Trash2 className="h-4 w-4 text-red-600" /></button>
                     </div>
                     <p className="mt-1 flex items-center gap-1 text-xs text-[#9a5b78]"><Clock className="h-3.5 w-3.5 text-[#ff4d94]" />{s.duration_min} min</p>
                     <p className="flex items-center gap-1 text-xs text-[#9a5b78]"><CatIcon className="h-3.5 w-3.5 text-[#ff4d94]" />{s.category}</p>
@@ -154,13 +154,13 @@ function CartPage() {
             </div>
             <div className="mt-4 overflow-x-hidden rounded-3xl border border-pink-100 p-3">
               <p className="mb-2 font-semibold text-[#3d2030]">Select Date</p>
-              <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={{ before: startOfToday() }} />
-              <p className="mt-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]">Today: {format(new Date(), "EEE, d MMM yyyy")}</p>
+              <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={(d) => format(d, "yyyy-MM-dd") < ksa.date} />
+              <p className="mt-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]">Today in Saudi Arabia: {format(parseISO(ksa.date), "EEE, d MMM yyyy")} · GMT+3</p>
             </div>
             {date && (
               <div className="mt-4 rounded-3xl border border-pink-100 p-3">
                 <p className="font-semibold text-[#3d2030]">Select Time</p>
-                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")}</p>
+                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")} · Saudi Arabia time (KSA, GMT+3)</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {slots.map((t) => (
                     <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)}</button>

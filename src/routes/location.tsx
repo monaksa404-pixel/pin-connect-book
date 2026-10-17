@@ -30,11 +30,11 @@ function LocationPage() {
     queryKey: ["paid-booking-row", user?.id],
     enabled: !!user && isSupabaseConfigured,
     queryFn: async () => {
-      const { data } = await supabase.from("bookings").select("code, status, booking_date, booking_time, items, payment_status").eq("payment_status", "verified").order("created_at", { ascending: false }).limit(1);
+      const { data } = await supabase.from("bookings").select("code, status, booking_date, booking_time, items, payment_status").eq("payment_status", "verified").eq("status", "confirmed").order("created_at", { ascending: false }).limit(1);
       return data?.[0] ?? null;
     },
   });
-  const open = !!user && !!booking && profile?.contact_enabled && !!(profile.assigned_address || profile.assigned_whatsapp);
+  const open = !!user && booking?.status === "confirmed" && profile?.contact_enabled && !!(profile.assigned_address || profile.assigned_whatsapp);
   const address = profile?.assigned_address || "";
   const map = profile?.assigned_map_url || "";
   const whatsapp = (profile?.assigned_whatsapp || s.whatsapp || "").replace(/\D/g, "");

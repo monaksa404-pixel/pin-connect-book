@@ -344,7 +344,7 @@ function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAc
         <p className="font-semibold">{person.full_name || "No name"} <span className="font-mono text-xs text-muted-foreground">{person.user_code}</span></p>
         <p className="text-sm">Mobile: {person.phone || "—"}</p>
         <p className="text-sm">City: {person.city || "—"}</p>
-        <p className="text-sm font-semibold text-rose-700">Wallet balance: {sar(Number(person.wallet_balance || 0))}</p>
+        <p className="text-sm font-semibold text-[#e23b86]">Wallet balance: {sar(Number(person.wallet_balance || 0))}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">Bank <Switch checked={allowBank} onCheckedChange={setAllowBank} /></label>
@@ -388,7 +388,7 @@ function ContactFields({ person }: { person: Profile }) {
         <Input className="max-w-sm" placeholder="Search a city or salon on the map" value={query} onChange={(e) => setQuery(e.target.value)} />
         <Button type="button" size="sm" variant="outline" onClick={() => { setAddr(query); setMap(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`); }}>Use this location</Button>
       </div>
-      {query && <iframe title="Map search" className="h-52 w-full rounded-2xl border border-rose-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`} />}
+      {query && <iframe title="Map search" className="h-52 w-full rounded-2xl border border-pink-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`} />}
       <Button size="sm" variant="outline" onClick={save}>Save location</Button>
     </div>
   );
@@ -423,6 +423,14 @@ function BanksTab() {
     setEdit(null); setFile(null);
     qc.invalidateQueries({ queryKey: ["admin-banks"] });
   };
+  const remove = async (id: string) => {
+    await supabase.from("profiles").update({ bank_account_id: null }).eq("bank_account_id", id);
+    await supabase.from("bookings").update({ bank_account_id: null }).eq("bank_account_id", id);
+    const { error } = await supabase.from("bank_accounts").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Bank account deleted");
+    qc.invalidateQueries({ queryKey: ["admin-banks"] });
+  };
   return (
     <div className="space-y-3">
       <Button className="rounded-full" onClick={() => setEdit({ ...blank })}><Plus className="mr-1 h-4 w-4" />Add bank account</Button>
@@ -433,7 +441,10 @@ function BanksTab() {
             <p className="text-xs text-muted-foreground">{b.account_holder} · {b.iban}</p>
             {mediaUrl(b.qr_url) && <img src={mediaUrl(b.qr_url)} alt="QR" className="mt-2 h-20 w-20 rounded-lg bg-white object-contain" />}
           </div>
-          <Button size="sm" variant="outline" onClick={() => setEdit(b)}>Edit</Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEdit(b)}>Edit</Button>
+            <Button size="sm" variant="destructive" onClick={() => remove(b.id)}><Trash2 className="mr-1 h-4 w-4" />Delete</Button>
+          </div>
         </div>
       ))}
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
@@ -736,7 +747,7 @@ function SlidersTab() {
   const defaults = ["/images/slider1.jpeg", "/images/slider2.jpeg", "/images/slider3.jpeg", "/images/slider4.jpeg"];
   return (
     <div className="space-y-4">
-      <div className="space-y-3 rounded-2xl border border-rose-100 bg-white p-4">
+      <div className="space-y-3 rounded-2xl border border-pink-100 bg-white p-4">
         <h3 className="font-semibold">Add slider</h3>
         <Input placeholder="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} />
         <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
@@ -785,7 +796,7 @@ function WithdrawalsTab() {
     <div className="space-y-3">
       {data.length === 0 && <p className="text-sm text-muted-foreground">No withdrawal requests.</p>}
       {data.map((w) => (
-        <div key={w.id} className="rounded-2xl border border-rose-100 bg-white p-4 text-sm">
+        <div key={w.id} className="rounded-2xl border border-pink-100 bg-white p-4 text-sm">
           <div className="flex justify-between"><p className="font-semibold">{w.user_code} · {sar(Number(w.amount))}</p><StatusBadge status={w.status} /></div>
           <p>Account name: {w.account_name}</p>
           <p>Account number: {w.account_number}</p>

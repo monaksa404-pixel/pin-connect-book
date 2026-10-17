@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { CalendarDays, CheckCheck, CreditCard, HelpCircle, MapPin, MoreVertical, Paperclip, Phone, Send, Smile, Tag } from "lucide-react";
+import { CalendarDays, CheckCheck, CreditCard, HelpCircle, MapPin, Paperclip, Send, Smile, Tag } from "lucide-react";
 import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -58,7 +58,6 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
   };
 
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
-  const phone = (settings.whatsapp || "").replace(/\D/g, "");
   const prompts = [
     ["Book Appointment", CalendarDays],
     ["Service Details", Tag],
@@ -102,16 +101,16 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         </div>
       </div>
       <div className="flex items-center gap-3 rounded-3xl bg-white p-3 shadow-sm">
-        <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[#ff4d94]">
-          {settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="text-lg font-semibold">BH</span>}
+        <span className="relative h-12 w-12 shrink-0">
+          <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[#ff4d94]">
+            {settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="text-lg font-semibold">BH</span>}
+          </span>
           <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${settings.support_online ? "bg-emerald-500" : "bg-gray-300"}`} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-[#3d2030]">Beauty House Support</p>
           <p className={`flex items-center gap-1 text-xs ${settings.support_online ? "text-emerald-600" : "text-[#9a5b78]"}`}><span className={`h-1.5 w-1.5 rounded-full ${settings.support_online ? "bg-emerald-500" : "bg-gray-300"}`} /> {settings.support_online ? "Online" : "Offline"}</p>
         </div>
-        {phone && <a href={`https://wa.me/${phone}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="grid h-10 w-10 place-items-center rounded-full bg-[#ff4d94] text-white"><Phone className="h-4 w-4" /></a>}
-        <span className="grid h-10 w-10 place-items-center text-[#ff4d94]" aria-hidden><MoreVertical className="h-5 w-5" /></span>
       </div>
       <div ref={box} className="mt-3 flex-1 space-y-3 overflow-y-auto">
         {rows.length === 0 && (

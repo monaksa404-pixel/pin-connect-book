@@ -454,9 +454,12 @@ end $$;
 -- ---------- Bookings: methods are now bank | wallet ----------
 alter table public.bookings drop constraint if exists bookings_payment_method_check;
 alter table public.bookings drop constraint if exists bookings_extra_method_check;
-update public.bookings set payment_method = 'wallet' where payment_method = 'stc';
-update public.bookings set extra_method = 'wallet' where extra_method = 'stc';
-alter table public.bookings add constraint bookings_payment_method_check check (payment_method in ('bank', 'wallet'));
+update public.bookings set payment_method = 'wallet' where lower(payment_method) = 'stc';
+update public.bookings set payment_method = 'card' where lower(payment_method) in ('credit', 'debit');
+update public.bookings set payment_method = 'bank' where payment_method is null or payment_method not in ('bank', 'wallet', 'card', 'stc');
+update public.bookings set extra_method = 'wallet' where lower(extra_method) = 'stc';
+update public.bookings set extra_method = 'bank' where extra_method is not null and extra_method not in ('bank', 'wallet');
+alter table public.bookings add constraint bookings_payment_method_check check (payment_method in ('bank', 'wallet', 'card', 'stc'));
 alter table public.bookings add constraint bookings_extra_method_check check (extra_method in ('bank', 'wallet'));
 alter table public.bookings add column if not exists bank_account_id uuid references public.bank_accounts(id) on delete set null;
 alter table public.bookings add column if not exists user_code text;
@@ -902,7 +905,7 @@ begin
       case when new.payment_status = 'verified' then 'Payment approved — ' || new.code else 'Payment rejected — ' || new.code end,
       coalesce(nullif(trim(new.admin_note), ''), case when new.payment_status = 'verified' then 'Your payment was received.' else 'Your payment could not be verified.' end),
       true, case when new.payment_status = 'verified' then 'approved' else 'rejected' end);
-  elsif new.status is distinct from old.status then
+  elsif new.status is distinct from old.status and new.payment_status is not distinct from old.payment_status then
     if new.status = 'completed' then
       insert into public.notifications(user_id, booking_id, title, body) values (new.user_id, new.id, 'Service completed', 'Thank you for visiting! Booking ' || new.code || ' is complete.');
     elsif new.status = 'cancelled' then

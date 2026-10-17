@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase, friendlyError, isSupabaseConfigured } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
@@ -7,6 +8,7 @@ import { createAccount } from "@/lib/signup.functions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { mediaUrl, settingsQuery } from "@/lib/data";
 import { AuthCard } from "./login";
 
 export const Route = createFileRoute("/signup")({
@@ -23,6 +25,8 @@ function SignupPage() {
   const navigate = useNavigate();
   const [f, setF] = useState({ name: "", phone: "", email: "", password: "" });
   const [busy, setBusy] = useState(false);
+  const { data: settings } = useQuery(settingsQuery);
+  const signImage = mediaUrl(settings?.signin_image_url);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   const submit = async (e: React.FormEvent) => {
@@ -43,7 +47,7 @@ function SignupPage() {
   };
 
   return (
-    <AuthCard title="Create account" sub="Sign up with your details, then sign in any time with the same email.">
+    <AuthCard title="Create account" sub="Sign up with your details, then sign in any time with the same email." image={signImage}>
       <form onSubmit={submit} className="space-y-4">
         <div><Label htmlFor="n" className="text-foreground">Full name</Label><Input id="n" required maxLength={80} autoComplete="name" value={f.name} onChange={set("name")} className="mt-1 h-11" /></div>
         <div><Label htmlFor="ph" className="text-foreground">Mobile number</Label><Input id="ph" required maxLength={16} inputMode="tel" autoComplete="tel" placeholder="05xxxxxxxx" value={f.phone} onChange={set("phone")} className="mt-1 h-11" /></div>

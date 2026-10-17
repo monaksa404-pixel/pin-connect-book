@@ -24,7 +24,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const { data: settings } = useQuery(settingsQuery);
-  const signImage = mediaUrl(settings?.signin_image_url) || "/images/logo.png";
+  const signImage = mediaUrl(settings?.signin_image_url);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,11 +57,11 @@ function LoginPage() {
   );
 }
 
-export function AuthCard({ title, sub, children, image = "/images/logo.png" }: { title: string; sub: string; children: React.ReactNode; image?: string }) {
+export function AuthCard({ title, sub, children, image }: { title: string; sub: string; children: React.ReactNode; image?: string }) {
   return (
-    <div className="bg-[#fff0f6] px-4 py-10">
-      <div className="mx-auto max-w-md rounded-3xl border border-pink-100 bg-white p-8 shadow-soft">
-        <img src={image} alt="The Beauty House Salon" className="mb-4 h-16 w-auto" />
+    <div className="bg-[#fff0f6] px-4 py-8 md:py-12">
+      <div className="mx-auto w-full max-w-md rounded-3xl border border-pink-100 bg-white p-5 shadow-soft sm:p-8">
+        {image && <img src={image} alt="The Beauty House Salon" className="mb-5 aspect-[4/3] w-full rounded-2xl bg-[#ffe4f2] object-cover" />}
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">{sub}</p>
         {children}
