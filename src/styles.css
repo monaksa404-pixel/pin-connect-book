@@ -106,10 +106,10 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.7 0.12 5);
   --gradient-hero: linear-gradient(135deg, oklch(0.95 0.03 15), oklch(0.98 0.015 60));
-  --gradient-rose: linear-gradient(135deg, oklch(0.6 0.14 5), oklch(0.5 0.12 355));
+  --gradient-rose: linear-gradient(135deg, #ff7ab3, #ff4d94);
   --shadow-soft: 0 20px 50px -20px oklch(0.56 0.13 5 / 0.25);
-  --font-display: "Cormorant Garamond", Georgia, serif;
-  --font-sans: "Manrope", system-ui, sans-serif;
+  --font-display: "Nunito Sans", system-ui, sans-serif;
+  --font-sans: "Nunito Sans", system-ui, sans-serif;
 }
 
 @layer base {
@@ -117,15 +117,20 @@
     border-color: var(--color-border);
   }
 
+  html, body { overflow-x: hidden; }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-weight: 500;
   }
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
+  button, [role="button"] { font-weight: 600; }
+  img, iframe, video { max-width: 100%; }
 }
 
 @utility bg-hero {

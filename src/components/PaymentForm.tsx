@@ -95,7 +95,7 @@ export function PaymentForm({
     <div className="space-y-5">
       {!only && (
         <>
-          <div className="rounded-2xl bg-rose p-5 text-primary-foreground">
+          <div className="rounded-2xl bg-[#ff4d94] p-5 text-white">
             <p className="text-xs uppercase tracking-widest opacity-80">Amount to pay now</p>
             <p className="font-display text-4xl font-semibold">{sar(amount)}</p>
           </div>

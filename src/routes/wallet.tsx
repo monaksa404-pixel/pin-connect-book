@@ -129,9 +129,9 @@ function WalletPage() {
             ["history", Receipt, "Transaction History"],
             ["withdraw", ArrowDownLeft, "Withdraw"],
           ] as const).map(([id, Icon, label]) => (
-            <button key={id} type="button" onClick={() => setPanel(id === "history" ? null : panel === id ? null : id)} className="rounded-3xl bg-white py-4 text-center text-xs font-semibold text-[#5c2344] shadow-sm">
+            <button key={id} type="button" onClick={() => setPanel(id === "history" ? null : panel === id ? null : id)} className="min-w-0 rounded-3xl bg-white px-1 py-4 text-center text-[11px] font-semibold leading-tight text-[#5c2344] shadow-sm">
               <span className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full bg-[#ffe4f2] text-[#ff4d94]"><Icon className="h-5 w-5" /></span>
-              {label}
+              {id === "history" ? <>Transaction<br />History</> : label}
             </button>
           ))}
         </div>

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { format, startOfToday } from "date-fns";
-import { CalendarDays, Clock, MapPin, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { CalendarDays, Clock, Flower2, Gift, MapPin, Minus, Plus, Scissors, ShoppingCart, Smile, Trash2, UserRound } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { advanceFor, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, servicesQuery, settingsQuery, timeSlots } from "@/lib/data";
 import { FullNotice } from "@/components/FullNotice";
@@ -20,12 +20,20 @@ export const Route = createFileRoute("/cart")({
   component: CartPage,
 });
 
+function categoryIcon(category: string) {
+  if (category === "Beard") return UserRound;
+  if (category === "Facial") return Smile;
+  if (category === "Massage") return Flower2;
+  if (category === "Packages") return Gift;
+  return Scissors;
+}
+
 function CartPage() {
   const { lines, setQty, remove, clear, total, add, setSlot, slot } = useCart();
   const navigate = useNavigate();
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
   const { data: services = [] } = useQuery(servicesQuery);
-  const { advance, remaining } = advanceFor(total, settings.advance_percent);
+  const { advance } = advanceFor(total, settings.advance_percent);
   const [fullOpen, setFullOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : new Date());
@@ -66,13 +74,15 @@ function CartPage() {
           )}
         </div>
         {lines.length === 0 ? (
-          <div className="mt-8 rounded-3xl bg-white p-8 text-center text-rose-900/70">
+          <div className="mt-8 rounded-3xl bg-white p-8 text-center text-[#9a5b78]">
             <p>Your cart is empty.</p>
             <Button asChild className="mt-4 rounded-full bg-[#ff4d94]"><Link to="/services">Browse services</Link></Button>
           </div>
         ) : (
           <ul className="mt-4 space-y-3">
-            {lines.map(({ service: s, qty }) => (
+            {lines.map(({ service: s, qty }) => {
+              const CatIcon = categoryIcon(s.category);
+              return (
               <li key={s.id} className="rounded-3xl bg-white p-3 shadow-sm">
                 <div className="flex gap-3">
                   <img src={serviceImage(s)} alt={s.name} className="h-24 w-24 rounded-2xl object-cover" />
@@ -82,7 +92,7 @@ function CartPage() {
                       <button type="button" onClick={() => remove(s.id)} aria-label="Remove"><Trash2 className="h-4 w-4 text-pink-300" /></button>
                     </div>
                     <p className="mt-1 flex items-center gap-1 text-xs text-[#9a5b78]"><Clock className="h-3.5 w-3.5 text-[#ff4d94]" />{s.duration_min} min</p>
-                    <p className="text-xs text-[#9a5b78]">{s.category}</p>
+                    <p className="flex items-center gap-1 text-xs text-[#9a5b78]"><CatIcon className="h-3.5 w-3.5 text-[#ff4d94]" />{s.category}</p>
                     <p className="flex items-center gap-1 text-xs text-[#9a5b78]"><MapPin className="h-3.5 w-3.5 text-[#ff4d94]" />{settings.salon_name}</p>
                     <div className="mt-2 flex items-center gap-3">
                       <button type="button" onClick={() => setQty(s.id, qty - 1)} className="grid h-7 w-7 place-items-center rounded-full border border-pink-200 text-[#ff4d94]" aria-label="Decrease"><Minus className="h-3.5 w-3.5" /></button>
@@ -93,8 +103,23 @@ function CartPage() {
                   <p className="self-start font-semibold text-[#ff4d94]">{sar(s.price * qty)}</p>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
+        )}
+
+        {lines.length > 0 && (
+          <div className="mt-6 rounded-3xl bg-white p-4 shadow-sm">
+            <h2 className="font-semibold text-[#ff4d94]">Price Summary</h2>
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between"><span>Total</span><span className="font-semibold">{sar(total)}</span></div>
+              <div className="flex justify-between"><span>Pay now ({settings.advance_percent}%)</span><span className="font-semibold">{sar(advance)}</span></div>
+            </div>
+            <button type="button" onClick={() => settings.bookings_full ? setFullOpen(true) : setDateOpen(true)} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#ff4d94] font-semibold text-white">
+              <CalendarDays className="h-4 w-4" /> Choose date & time →
+            </button>
+            <Link to="/services" className="mt-3 grid h-12 place-items-center rounded-full border border-pink-200 font-semibold text-[#ff4d94]">+ Add more services</Link>
+          </div>
         )}
 
         {extra.length > 0 && (
@@ -116,24 +141,6 @@ function CartPage() {
           </section>
         )}
 
-        {lines.length > 0 && (
-          <div className="mt-6 rounded-3xl bg-white p-4 shadow-sm">
-            <h2 className="font-semibold text-[#ff4d94]">Price Summary</h2>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between"><span>Total</span><span className="font-semibold">{sar(total)}</span></div>
-              <div className="flex justify-between"><span>Pay now ({settings.advance_percent}%)</span><span className="font-semibold">{sar(advance)}</span></div>
-              <div className="flex justify-between"><span>Pay at salon (cash)</span><span className="font-semibold">{sar(remaining)}</span></div>
-            </div>
-            <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#ffe4f2] p-3">
-              <div><p className="font-semibold text-[#ff4d94]">Remaining amount</p><p className="text-xs text-[#9a5b78]">You will pay at the salon</p></div>
-              <p className="text-xl font-semibold text-[#ff4d94]">{sar(remaining)}</p>
-            </div>
-            <button type="button" onClick={() => settings.bookings_full ? setFullOpen(true) : setDateOpen(true)} className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#ff4d94] font-semibold text-white">
-              <CalendarDays className="h-4 w-4" /> Choose date & time →
-            </button>
-            <Link to="/services" className="mt-3 grid h-12 place-items-center rounded-full border border-pink-200 font-semibold text-[#ff4d94]">+ Add more services</Link>
-          </div>
-        )}
       </div>
       {dateOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-pink-950/40 p-3 md:items-center">
@@ -145,23 +152,23 @@ function CartPage() {
               </div>
               <button type="button" onClick={() => setDateOpen(false)} className="text-2xl text-[#9a5b78]" aria-label="Close">×</button>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-3xl border border-pink-100 p-3">
-                <p className="mb-2 font-semibold text-[#3d2030]">Select Date</p>
-                <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={{ before: startOfToday() }} />
-                <p className="mt-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]">Today: {format(new Date(), "EEE, d MMM yyyy")}</p>
-              </div>
-              <div className="rounded-3xl border border-pink-100 p-3">
+            <div className="mt-4 overflow-x-hidden rounded-3xl border border-pink-100 p-3">
+              <p className="mb-2 font-semibold text-[#3d2030]">Select Date</p>
+              <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={{ before: startOfToday() }} />
+              <p className="mt-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]">Today: {format(new Date(), "EEE, d MMM yyyy")}</p>
+            </div>
+            {date && (
+              <div className="mt-4 rounded-3xl border border-pink-100 p-3">
                 <p className="font-semibold text-[#3d2030]">Select Time</p>
-                <p className="text-xs text-[#9a5b78]">{date ? `Available time slots for ${format(date, "EEE, d MMM yyyy")}` : "Pick a date first"}</p>
-                <div className="mt-3 grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
+                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {slots.map((t) => (
                     <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)}</button>
                   ))}
-                  {date && slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">No times left today.</p>}
+                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">No times left today.</p>}
                 </div>
               </div>
-            </div>
+            )}
             <button
               type="button"
               disabled={!date || !time}

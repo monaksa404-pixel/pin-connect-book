@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { CalendarDays, MapPin, MessageCircle } from "lucide-react";
+import { CalendarDays, Check, Clock, MapPin, Navigation } from "lucide-react";
 import { DEFAULT_SETTINGS, fmtTime, serviceImage, servicesQuery, settingsQuery } from "@/lib/data";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/lib/profile";
@@ -37,8 +37,11 @@ function LocationPage() {
   const open = !!user && !!booking && profile?.contact_enabled && !!(profile.assigned_address || profile.assigned_whatsapp);
   const address = profile?.assigned_address || "";
   const map = profile?.assigned_map_url || "";
-  const whatsapp = (profile?.assigned_whatsapp || "").replace(/\D/g, "");
-  const shown = whatsapp ? `+${whatsapp}` : "";
+  const whatsapp = (profile?.assigned_whatsapp || s.whatsapp || "").replace(/\D/g, "");
+  const shown = whatsapp.startsWith("966") && whatsapp.length > 5
+    ? `+966 ${whatsapp.slice(3, 5)} ${whatsapp.slice(5, 8)} ${whatsapp.slice(8)}`
+    : whatsapp ? `+${whatsapp}` : "";
+  const mapsHref = map || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
   const items = (booking?.items ?? []) as { name: string; qty: number; service_id?: string }[];
   const pic = services.find((x) => x.id === items[0]?.service_id);
 
@@ -56,43 +59,68 @@ function LocationPage() {
         {open && booking && (
           <>
             <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="flex items-center gap-2 font-semibold text-[#ff4d94]"><CalendarDays className="h-4 w-4" /> Your Booking Details</h2>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white"><CalendarDays className="h-4 w-4" /></span>
+                Your <span className="text-[#ff4d94]">Booking Details</span>
+              </h2>
               <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <img src={pic ? serviceImage(pic) : "/images/slider1.jpeg"} alt="" className="h-14 w-14 rounded-xl object-cover" />
-                  <div>
+                <div className="flex min-w-0 items-center gap-3">
+                  <img src={pic ? serviceImage(pic) : "/images/slider1.jpeg"} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                  <div className="min-w-0">
                     <p className="font-semibold text-[#3d2030]">{items.map((i) => `${i.name} × ${i.qty}`).join(", ")}</p>
-                    <p className="text-sm text-[#9a5b78]">{fmtTime(String(booking.booking_time).slice(0, 5))}{booking.booking_date ? `, ${format(parseISO(booking.booking_date), "d MMM yyyy")}` : ""}</p>
+                    <p className="mt-0.5 flex items-center gap-1 text-sm text-[#9a5b78]">
+                      <Clock className="h-3.5 w-3.5 text-[#ff4d94]" />
+                      {fmtTime(String(booking.booking_time).slice(0, 5))}{booking.booking_date ? `, ${format(parseISO(booking.booking_date), "d MMM yyyy")}` : ""}
+                    </p>
                   </div>
                 </div>
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold capitalize text-emerald-700">{booking.status}</span>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold capitalize text-emerald-700"><Check className="h-3.5 w-3.5" />{booking.status}</span>
               </div>
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="font-semibold text-[#3d2030]">Salon <span className="text-[#ff4d94]">Contact</span></h2>
-              <p className="text-sm text-[#9a5b78]">For any questions or directions, you can contact us on WhatsApp.</p>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M20.5 3.5A11 11 0 0 0 2.1 17.2L1 23l6-1.6A11 11 0 0 0 20.5 3.5zm-8.5 17a9 9 0 0 1-4.6-1.3l-.3-.2-3.5.9.9-3.4-.2-.3A9 9 0 1 1 12 20.5zm5-6.7c-.3-.1-1.6-.8-1.8-.9s-.4-.1-.6.1-.7.9-.8 1-.3.2-.6.1a7.4 7.4 0 0 1-2.2-1.4 8.2 8.2 0 0 1-1.5-1.9c-.2-.3 0-.4.1-.6l.4-.5.2-.3a.5.5 0 0 0 0-.5c-.1-.1-.6-1.4-.8-1.9s-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 12 12 0 0 0 4.5 4c.6.3 1.1.4 1.5.5a3.6 3.6 0 0 0 1.7.1 2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.6-.3z" /></svg>
+                </span>
+                Salon <span className="text-[#ff4d94]">Contact</span>
+              </h2>
+              <p className="mt-2 text-sm text-[#9a5b78]">For any questions or directions, you can contact us on WhatsApp.</p>
               {whatsapp && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-pink-100 p-3">
                   <div className="flex items-center gap-2">
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-emerald-500 text-white"><MessageCircle className="h-5 w-5" /></span>
-                    <div><p className="text-xs text-[#9a5b78]">WhatsApp Number</p><p className="font-semibold">{shown}</p></div>
+                    <span className="grid h-10 w-10 place-items-center rounded-full bg-[#25D366] text-white">
+                      <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden><path d="M20.5 3.5A11 11 0 0 0 2.1 17.2L1 23l6-1.6A11 11 0 0 0 20.5 3.5zm-8.5 17a9 9 0 0 1-4.6-1.3l-.3-.2-3.5.9.9-3.4-.2-.3A9 9 0 1 1 12 20.5zm5-6.7c-.3-.1-1.6-.8-1.8-.9s-.4-.1-.6.1-.7.9-.8 1-.3.2-.6.1a7.4 7.4 0 0 1-2.2-1.4 8.2 8.2 0 0 1-1.5-1.9c-.2-.3 0-.4.1-.6l.4-.5.2-.3a.5.5 0 0 0 0-.5c-.1-.1-.6-1.4-.8-1.9s-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 12 12 0 0 0 4.5 4c.6.3 1.1.4 1.5.5a3.6 3.6 0 0 0 1.7.1 2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.6-.3z" /></svg>
+                    </span>
+                    <div><p className="text-xs text-[#9a5b78]">WhatsApp Number</p><p className="font-semibold text-[#3d2030]">{shown}</p></div>
                   </div>
-                  <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" className="rounded-full bg-[#ff4d94] px-4 py-2 text-sm font-semibold text-white">Chat on WhatsApp →</a>
+                  <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-[#ff4d94] px-4 py-2 text-sm font-semibold text-white">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M20.5 3.5A11 11 0 0 0 2.1 17.2L1 23l6-1.6A11 11 0 0 0 20.5 3.5zm-8.5 17a9 9 0 0 1-4.6-1.3l-.3-.2-3.5.9.9-3.4-.2-.3A9 9 0 1 1 12 20.5z" /></svg>
+                    Chat on WhatsApp →
+                  </a>
                 </div>
               )}
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="font-semibold text-[#ff4d94]">Salon Location</h2>
-              <p className="text-sm text-[#9a5b78]">Here is our exact location. You can open it in Google Maps for easy directions. Open daily {fmtTime(s.open_time)} – {fmtTime(s.close_time)}.</p>
-              <iframe title="Map" className="mt-3 h-64 w-full rounded-2xl border border-pink-100" loading="lazy" src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`} />
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white"><MapPin className="h-4 w-4" /></span>
+                Salon <span className="text-[#ff4d94]">Location</span>
+              </h2>
+              <p className="mt-2 text-sm text-[#9a5b78]">Here is our exact location. You can open it in Google Maps for easy directions.</p>
+              <div className="relative mt-3">
+                <iframe title="Map" className="h-64 w-full rounded-2xl border border-pink-100" loading="lazy" src={`https://maps.google.com/maps?q=${encodeURIComponent(address || s.address || s.salon_name)}&z=15&output=embed`} />
+                <div className="pointer-events-none absolute left-1/2 top-4 w-[78%] -translate-x-1/2 rounded-2xl bg-white p-3 text-center shadow-md">
+                  <p className="font-semibold text-[#3d2030]">{s.salon_name}</p>
+                  <p className="text-xs text-[#9a5b78]">{address || s.address}</p>
+                </div>
+              </div>
               <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-[#fff0f6] p-3 text-sm">
-                <p className="flex items-center gap-2"><MapPin className="h-4 w-4 text-[#ff4d94]" />{address}</p>
-                {map && <a href={map} target="_blank" rel="noreferrer" className="shrink-0 font-semibold text-[#ff4d94]">Open in Maps</a>}
+                <p className="flex items-center gap-2 text-[#5c2344]"><MapPin className="h-4 w-4 shrink-0 text-[#ff4d94]" />{address || s.address}</p>
+                {mapsHref && <a href={mapsHref} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 font-semibold text-[#ff4d94]"><Navigation className="h-4 w-4" />Open in Maps</a>}
               </div>
             </div>
           </>
         )}
-        <Link to="/my-bookings" className="grid h-12 place-items-center rounded-full border border-pink-200 bg-white font-semibold text-[#ff4d94]">← Back to My Bookings</Link>
+        <Link to="/my-bookings" className="flex h-12 items-center justify-center gap-2 rounded-full border border-pink-200 bg-white font-semibold text-[#ff4d94]">← Back to My Bookings</Link>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { CalendarDays, CreditCard, HelpCircle, MapPin, Send, Tag } from "lucide-react";
+import { CalendarDays, CheckCheck, CreditCard, HelpCircle, MapPin, MoreVertical, Paperclip, Phone, Send, Smile, Tag } from "lucide-react";
+import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: string };
+type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: string; attachment_url?: string | null };
 
 export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin" }) {
   const qc = useQueryClient();
@@ -18,13 +19,24 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
     queryKey: ["chat", userId],
     refetchInterval: 4000,
     queryFn: async () => {
-      const { data, error } = await supabase.from("support_messages").select("id, sender, body, created_at").eq("user_id", userId).order("created_at");
+      const { data, error } = await supabase.from("support_messages").select("id, sender, body, created_at, attachment_url").eq("user_id", userId).order("created_at");
       if (error) { toast.error(error.message); return [] as Msg[]; }
       return (data ?? []) as Msg[];
     },
   });
   const rows = Array.isArray(data) ? data : [];
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const sendFile = async (file: File) => {
+    const path = `chat/${userId}/${Date.now()}-${file.name.replace(/[^a-z0-9.]/gi, "")}`;
+    const up = await supabase.storage.from("media").upload(path, file);
+    if (up.error) { toast.error(up.error.message); return; }
+    const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+    const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body: file.name.slice(0, 80), attachment_url: url });
+    if (error) { toast.error(error.message); return; }
+    if (as === "user") await sendAlert("support", `New support file\n${file.name}`);
+    await qc.invalidateQueries({ queryKey: ["chat", userId] });
+  };
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     const body = text.trim().slice(0, 2000);
@@ -33,7 +45,10 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
     try {
       const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body });
       if (error) { toast.error(error.message); setText(body); return; }
-      if (as === "user") await sendAlert("support", `New support message:\n${body}`);
+      if (as === "user") {
+        const { data: who } = await supabase.from("profiles").select("full_name, user_code").eq("id", userId).maybeSingle();
+        await sendAlert("support", `New support message\nName: ${who?.full_name || "Customer"}\nUser: ${who?.user_code || ""}\n${body}`);
+      }
       await qc.invalidateQueries({ queryKey: ["chat", userId] });
       box.current?.scrollTo({ top: box.current.scrollHeight });
     } catch (err) {
@@ -42,6 +57,8 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
     }
   };
 
+  const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
+  const phone = (settings.whatsapp || "").replace(/\D/g, "");
   const prompts = [
     ["Book Appointment", CalendarDays],
     ["Service Details", Tag],
@@ -57,39 +74,65 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
             <div key={m.id} className={cn("flex", m.sender === "admin" ? "justify-end" : "justify-start")}>
               <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "admin" ? "bg-primary text-primary-foreground" : "bg-muted")}>
                 <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{/\.(png|jpe?g|gif|webp)$/i.test(m.attachment_url) ? <img src={m.attachment_url} alt="" className="max-h-40 rounded-lg" /> : "Open file"}</a>}
               </div>
             </div>
           ))}
         </div>
         <form onSubmit={send} className="flex gap-2 border-t border-border p-3">
+          <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
+          <Button type="button" size="icon" variant="ghost" aria-label="Attachment" onClick={() => fileRef.current?.click()}><Paperclip className="h-4 w-4" /></Button>
           <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Reply…" className="rounded-full" />
           <Button type="submit" size="icon" className="shrink-0 rounded-full" aria-label="Send"><Send className="h-4 w-4" /></Button>
         </form>
       </div>
     );
   }
+  const time = (iso: string) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
   return (
-    <div className="flex min-h-[calc(100dvh-9rem)] flex-col pb-36">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="flex min-h-[calc(100dvh-9rem)] flex-col pb-44">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-4xl font-semibold text-[#5c2344]">Live Chat</h1>
           <p className="text-sm text-[#9a5b78]">Chat with our support team</p>
         </div>
-        <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">We are Online<br />Usually replies in a few minutes</div>
-      </div>
-      <div className="flex items-center justify-between rounded-3xl bg-white p-4 shadow-sm">
-        <div>
-          <p className="font-semibold text-[#3d2030]">Beauty House Support</p>
-          <p className="text-xs text-emerald-600">Online</p>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-right">
+          <p className="flex items-center justify-end gap-1 text-xs font-semibold text-emerald-600"><span className="h-2 w-2 rounded-full bg-emerald-500" /> We are Online</p>
+          <p className="text-[10px] text-[#9a5b78]">Usually replies in a few minutes</p>
         </div>
       </div>
+      <div className="flex items-center gap-3 rounded-3xl bg-white p-3 shadow-sm">
+        <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[#ff4d94]">
+          {settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : <span className="text-lg font-semibold">BH</span>}
+          <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white ${settings.support_online ? "bg-emerald-500" : "bg-gray-300"}`} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-[#3d2030]">Beauty House Support</p>
+          <p className={`flex items-center gap-1 text-xs ${settings.support_online ? "text-emerald-600" : "text-[#9a5b78]"}`}><span className={`h-1.5 w-1.5 rounded-full ${settings.support_online ? "bg-emerald-500" : "bg-gray-300"}`} /> {settings.support_online ? "Online" : "Offline"}</p>
+        </div>
+        {phone && <a href={`https://wa.me/${phone}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="grid h-10 w-10 place-items-center rounded-full bg-[#ff4d94] text-white"><Phone className="h-4 w-4" /></a>}
+        <span className="grid h-10 w-10 place-items-center text-[#ff4d94]" aria-hidden><MoreVertical className="h-5 w-5" /></span>
+      </div>
       <div ref={box} className="mt-3 flex-1 space-y-3 overflow-y-auto">
-        {rows.length === 0 && <p className="max-w-[80%] rounded-2xl bg-white p-4 text-sm text-[#3d2030] shadow-sm">Hello! Welcome to The Beauty House Salon. How can we help you today?</p>}
+        {rows.length === 0 && (
+          <div className="flex items-end gap-2">
+            <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[10px] font-semibold text-[#ff4d94]">{settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : "BH"}</span>
+            <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-sm text-[#3d2030] shadow-sm">
+              <p>Hello! 👋</p>
+              <p>Welcome to The Beauty House Salon. How can we help you today?</p>
+            </div>
+          </div>
+        )}
         {rows.map((m) => (
-          <div key={m.id} className={cn("flex", m.sender === "user" ? "justify-end" : "justify-start")}>
-            <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "user" ? "bg-[#ff4d94] text-white" : "bg-white text-[#3d2030] shadow-sm")}>
+          <div key={m.id} className={cn("flex items-end gap-2", m.sender === "user" ? "justify-end" : "justify-start")}>
+            {m.sender !== "user" && <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[10px] font-semibold text-[#ff4d94]">{settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : "BH"}</span>}
+            <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "user" ? "rounded-br-md bg-[#ff4d94] text-white" : "rounded-bl-md bg-white text-[#3d2030] shadow-sm")}>
               <p className="whitespace-pre-wrap break-words">{m.body}</p>
-              <p className="mt-1 text-[10px] opacity-70">{m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</p>
+              {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{/\.(png|jpe?g|gif|webp)$/i.test(m.attachment_url) ? <img src={m.attachment_url} alt="" className="max-h-40 rounded-lg" /> : "Open file"}</a>}
+              <p className={cn("mt-1 flex items-center justify-end gap-1 text-[10px]", m.sender === "user" ? "text-white/80" : "text-[#9a5b78]")}>
+                {time(m.created_at)}
+                {m.sender === "user" && <CheckCheck className="h-3 w-3" />}
+              </p>
             </div>
           </div>
         ))}
@@ -98,14 +141,17 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         <div className="mx-auto max-w-3xl">
           <div className="mb-2 grid grid-cols-5 gap-2">
             {prompts.map(([label, Icon]) => (
-              <button key={label} type="button" onClick={() => setText(label)} className="rounded-2xl bg-white px-1 py-2 text-center text-[10px] font-semibold text-[#ff4d94] shadow-sm">
+              <button key={label} type="button" onClick={() => setText(label)} className="rounded-2xl bg-white px-1 py-2 text-center text-[10px] font-semibold leading-tight text-[#ff4d94] shadow-sm">
                 <Icon className="mx-auto mb-1 h-4 w-4" />
                 {label}
               </button>
             ))}
           </div>
-          <form onSubmit={send} className="flex gap-2">
-            <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="rounded-full bg-white" />
+          <form onSubmit={send} className="flex items-center gap-2 rounded-full bg-white px-3 py-1 shadow-sm">
+            <button type="button" aria-label="Emoji" onClick={() => setText((t) => `${t}😊`)} className="text-[#ff4d94]"><Smile className="h-5 w-5" /></button>
+            <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="border-0 bg-transparent shadow-none focus-visible:ring-0" />
+            <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
+            <button type="button" aria-label="Attachment" onClick={() => fileRef.current?.click()} className="text-[#9a5b78]"><Paperclip className="h-5 w-5" /></button>
             <Button type="submit" size="icon" className="shrink-0 rounded-full bg-[#ff4d94]" aria-label="Send"><Send className="h-4 w-4" /></Button>
           </form>
         </div>

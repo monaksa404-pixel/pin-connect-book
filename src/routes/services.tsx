@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Clock, Flower2, Gift, Heart, LayoutGrid, Scissors, Search, ShoppingCart, Smile, UserRound } from "lucide-react";
+import { Clock, Flame, Flower2, Gift, Heart, LayoutGrid, Scissors, Search, ShoppingCart, Smile, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { CATEGORIES, DEFAULT_SETTINGS, sar, serviceImage, servicesQuery, settingsQuery } from "@/lib/data";
 import { useCart } from "@/lib/cart";
@@ -74,20 +74,20 @@ function ServicesPage() {
           <Search className="h-4 w-4" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search services..." className="w-full bg-transparent text-sm text-[#5c2344] outline-none" />
         </label>
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+        <div className="mt-4 grid grid-cols-6 gap-1">
           {ICONS.map((c) => {
             const on = active === c.category || (!active && c.label === "All");
             return (
-              <Link key={c.label} to="/services" search={c.category ? { category: c.category } : {}} className="flex w-[76px] shrink-0 flex-col items-center gap-2 text-center text-[11px] font-semibold text-[#5c2344]">
-                <span className={`grid h-16 w-16 place-items-center rounded-2xl shadow-sm ${on ? "bg-[#ff4d94] text-white" : "border border-pink-100 bg-white text-[#ff4d94]"}`}>
-                  <c.icon className="h-6 w-6" />
+              <Link key={c.label} to="/services" search={c.category ? { category: c.category } : {}} className="flex min-w-0 flex-col items-center gap-1 text-center text-[10px] font-semibold text-[#5c2344] sm:text-xs">
+                <span className={`grid h-10 w-10 place-items-center rounded-2xl shadow-sm sm:h-12 sm:w-12 ${on ? "bg-[#ff4d94] text-white" : "border border-pink-100 bg-white text-[#ff4d94]"}`}>
+                  <c.icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </span>
                 {c.label}
               </Link>
             );
           })}
         </div>
-        {isLoading && <p className="mt-6 text-rose-900/60">Loading services…</p>}
+        {isLoading && <p className="mt-6 text-[#9a5b78]">Loading services…</p>}
         {groups.map((g) => {
           const items = g === "Packages" ? filtered : filtered.filter((s) => s.category === g);
           if (!items.length) return null;
@@ -103,17 +103,16 @@ function ServicesPage() {
                     <div className="relative">
                       <img src={serviceImage(s)} alt={s.name} className="aspect-[4/3] w-full rounded-2xl object-cover" />
                       <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-[#ff4d94]"><Heart className="h-3.5 w-3.5" /></span>
-                      {s.popular && <span className="absolute left-2 top-2 rounded-full bg-[#ff4d94] px-2 py-0.5 text-[10px] font-bold text-white">HOT 🔥</span>}
+                      {s.popular && <span className="absolute left-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-red-600">HOT <Flame className="h-3 w-3 fill-red-600 text-red-600" /></span>}
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-[#3d2030]">{s.name}</h3>
-                    <p className="text-xs font-semibold text-[#ff4d94]">{sar(s.price)}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-[11px] text-[#9a5b78]"><Clock className="h-3.5 w-3.5 text-[#ff4d94]" />{s.duration_min} min</span>
-                      <span className="h-4 w-px bg-pink-200" />
-                      <button type="button" onClick={() => addService(s)} className="inline-flex items-center gap-1 rounded-full bg-[#ff4d94] px-2.5 py-1 text-[11px] font-semibold text-white">
-                        <ShoppingCart className="h-3.5 w-3.5" /> Add to Cart
-                      </button>
+                    <h3 className="mt-2 text-base font-semibold text-[#3d2030] md:text-lg">{s.name}</h3>
+                    <div className="mt-1 flex items-center justify-between text-sm font-semibold">
+                      <span className="text-[#ff4d94]">{sar(s.price)}</span>
+                      <span className="flex items-center gap-1 text-[#9a5b78]"><Clock className="h-4 w-4 text-[#ff4d94]" />{s.duration_min} min</span>
                     </div>
+                    <button type="button" onClick={() => addService(s)} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ff4d94] py-2.5 text-sm font-semibold text-white">
+                      <ShoppingCart className="h-4 w-4" /> Add to Cart
+                    </button>
                   </article>
                 ))}
               </div>

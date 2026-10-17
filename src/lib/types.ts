@@ -33,6 +33,8 @@ export type Settings = {
   map_url: string | null;
   logo_url: string | null;
   signin_image_url: string | null;
+  support_avatar_url: string | null;
+  support_online: boolean;
 };
 
 export type BookingItem = { service_id: string; name: string; price: number; qty: number };

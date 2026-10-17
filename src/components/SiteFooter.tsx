@@ -5,7 +5,7 @@ import { settingsQuery, fmtTime } from "@/lib/data";
 export function SiteFooter() {
   const { data: s } = useQuery(settingsQuery);
   return (
-    <footer className="mt-16 hidden border-t border-rose-200 bg-[#ffd6e8] md:block">
+    <footer className="mt-16 hidden border-t border-pink-100 bg-[#fff0f6] md:block">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-3">
         <div>
           <p className="font-display text-2xl font-semibold">{s?.salon_name}</p>

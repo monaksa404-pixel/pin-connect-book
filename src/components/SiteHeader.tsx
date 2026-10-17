@@ -38,14 +38,11 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-pink-100 bg-[#fff0f6]/95 backdrop-blur-md">
-      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[auto_1fr_auto] items-center px-3 md:flex md:justify-between md:px-4">
-        <button className="rounded-full p-2 text-rose-700 md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
+      <div className="mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-3">
+        <div className="flex min-w-0 items-center overflow-hidden">
+        <button className="rounded-full p-2 text-[#ff4d94] md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
-        <Link to="/" className="col-start-2 flex justify-center md:col-auto md:justify-start">
-          <img src={settings?.logo_url || "/images/logo.png"} alt={settings?.salon_name ?? "The Beauty House"} className="h-12 w-auto" />
-        </Link>
-
         <nav className="hidden items-center gap-1 md:flex">
           {NAV.map((n) => (
             <Link
@@ -59,8 +56,11 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-
-        <div className="flex items-center gap-1 text-[#ff4d94]">
+        </div>
+        <Link to="/" className="flex justify-center">
+          <img src={settings?.logo_url || "/images/logo.png"} alt={settings?.salon_name ?? "The Beauty House"} className="h-12 w-auto" />
+        </Link>
+        <div className="flex items-center justify-end gap-1 text-[#ff4d94]">
           <Link to="/notifications" className="relative rounded-full p-2" aria-label="Notifications">
             <Bell className="h-5 w-5" />
             {unread > 0 && (

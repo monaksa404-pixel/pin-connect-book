@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Clock, Flower2, Gift, Heart, LayoutGrid, Scissors, ShoppingCart, Smile, UserRound } from "lucide-react";
+import { Clock, Flame, Flower2, Gift, Heart, LayoutGrid, Scissors, ShoppingCart, Smile, UserRound } from "lucide-react";
 import { FullNotice } from "@/components/FullNotice";
 import { categoryImage, fmtTime, mediaUrl, sar, serviceImage, servicesQuery, settingsQuery, slidersQuery, DEFAULT_SETTINGS } from "@/lib/data";
 import { useCart } from "@/lib/cart";
@@ -59,10 +59,10 @@ function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-[#ffd6e8] pb-24 md:pb-10">
+    <div className="min-h-screen bg-[#fff0f6] pb-24 md:pb-10">
       <FullNotice open={fullOpen} message={settings.full_message || "Bookings are currently unavailable because we have too many customers."} onClose={() => setFullOpen(false)} />
       <div className="mx-auto max-w-6xl px-4 pt-4">
-        <div className="relative overflow-hidden rounded-[28px] bg-rose-100 shadow-sm">
+        <div className="relative overflow-hidden rounded-[28px] bg-[#ffe4f2] shadow-sm">
           <div className="flex transition-transform duration-500" style={{ transform: `translateX(-${slide * 100}%)` }}>
             {slides.map((s) => (
               <img key={s.key} src={s.src} alt={settings.salon_name} className="aspect-[16/10] w-full shrink-0 object-cover sm:aspect-[16/7]" />
@@ -75,16 +75,16 @@ function Index() {
           )}
           <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
             {slides.map((s, i) => (
-              <button key={s.key} type="button" aria-label={`Slide ${i + 1}`} onClick={() => setSlide(i)} className={`h-2 rounded-full ${i === slide ? "w-5 bg-rose-600" : "w-2 bg-white/80"}`} />
+              <button key={s.key} type="button" aria-label={`Slide ${i + 1}`} onClick={() => setSlide(i)} className={`h-2 rounded-full ${i === slide ? "w-5 bg-[#ff4d94]" : "w-2 bg-white/80"}`} />
             ))}
           </div>
         </div>
 
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+        <div className="mt-4 grid grid-cols-6 gap-1">
           {CATS.map((c) => (
-            <Link key={c.label} to={c.to} search={c.search} className="flex w-[76px] shrink-0 flex-col items-center gap-2 text-center text-[11px] font-semibold text-rose-950">
-              <span className={`grid h-16 w-16 place-items-center rounded-2xl shadow-sm ${c.label === "All" ? "bg-rose-600 text-white" : "border border-rose-100 bg-white text-rose-600"}`}>
-                <c.icon className="h-6 w-6" />
+            <Link key={c.label} to={c.to} search={c.search} className="flex min-w-0 flex-col items-center gap-1 text-center text-[10px] font-semibold text-[#5c2344] sm:text-xs">
+              <span className={`grid h-10 w-10 place-items-center rounded-2xl shadow-sm sm:h-12 sm:w-12 ${c.label === "All" ? "bg-[#ff4d94] text-white" : "border border-pink-100 bg-white text-[#ff4d94]"}`}>
+                <c.icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </span>
               {c.label}
             </Link>
@@ -92,22 +92,22 @@ function Index() {
         </div>
 
         <div className="mt-6 flex items-end justify-between">
-          <h2 className="font-display text-2xl font-semibold text-rose-950 sm:text-3xl">Most Popular Services</h2>
-          <Link to="/services" className="text-sm font-semibold text-rose-600">View All &gt;</Link>
+          <h2 className="font-display text-2xl font-semibold text-[#5c2344] sm:text-3xl">Most Popular Services</h2>
+          <Link to="/services" className="text-sm font-semibold text-[#ff4d94]">View All &gt;</Link>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {popular.map((s) => (
-            <article key={s.id} className="overflow-hidden rounded-3xl border border-rose-100 bg-white shadow-sm">
+            <article key={s.id} className="overflow-hidden rounded-3xl border border-pink-100 bg-white shadow-sm">
               <div className="relative">
                 <img src={serviceImage(s)} alt={s.name} className="aspect-[4/3] w-full object-cover" />
-                {s.popular && <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white">HOT 🔥</span>}
-                <span className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-rose-500"><Heart className="h-4 w-4" /></span>
+                {s.popular && <span className="absolute left-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-red-600">HOT <Flame className="h-3 w-3 fill-red-600 text-red-600" /></span>}
+                <span className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-[#ff4d94]"><Heart className="h-4 w-4" /></span>
               </div>
               <div className="p-3">
-                <h3 className="font-semibold leading-tight text-rose-950">{s.name}</h3>
-                <p className="mt-1 line-clamp-2 text-xs text-rose-900/60">{s.description}</p>
+                <h3 className="font-semibold leading-tight text-[#5c2344]">{s.name}</h3>
+                <p className="mt-1 line-clamp-2 text-xs text-[#9a5b78]">{s.description}</p>
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[11px] text-rose-900/70"><Clock className="h-3.5 w-3.5" />{s.duration_min} min</span>
+                  <span className="flex items-center gap-1 text-[11px] text-[#9a5b78]"><Clock className="h-3.5 w-3.5" />{s.duration_min} min</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -115,26 +115,26 @@ function Index() {
                       add(s);
                       toast.success(`${s.name} added to cart`);
                     }}
-                    className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-2.5 py-1.5 text-[11px] font-semibold text-white"
+                    className="inline-flex items-center gap-1 rounded-full bg-[#ff4d94] px-2.5 py-1.5 text-[11px] font-semibold text-white"
                   >
                     <ShoppingCart className="h-3.5 w-3.5" /> Add to Cart
                   </button>
                 </div>
-                <p className="mt-2 text-xs font-semibold text-rose-700">{sar(s.price)}</p>
+                <p className="mt-2 text-xs font-semibold text-[#e23b86]">{sar(s.price)}</p>
               </div>
             </article>
           ))}
         </div>
 
-        <p className="mt-8 hidden items-center justify-center gap-6 text-sm text-rose-900/70 md:flex">
-          <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-rose-600" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)}</span>
+        <p className="mt-8 hidden items-center justify-center gap-6 text-sm text-[#9a5b78] md:flex">
+          <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-[#ff4d94]" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)}</span>
           <span>{settings.address}</span>
         </p>
         <div className="mt-6 hidden gap-3 md:grid md:grid-cols-4">
           {["Haircuts", "Beard", "Facial", "Massage"].map((c) => (
             <Link key={c} to="/services" search={{ category: c }} className="overflow-hidden rounded-3xl bg-white shadow-sm">
               <img src={categoryImage[c]} alt={c} className="aspect-[4/3] w-full object-cover" />
-              <p className="p-3 text-center text-sm font-semibold text-rose-950">{c}</p>
+              <p className="p-3 text-center text-sm font-semibold text-[#5c2344]">{c}</p>
             </Link>
           ))}
         </div>

@@ -44,7 +44,7 @@ function LoginPage() {
       <form onSubmit={submit} className="space-y-4">
         <div><Label htmlFor="u" className="text-foreground">Email / Gmail</Label><Input id="u" required autoComplete="email" value={login} onChange={(e) => setLogin(e.target.value)} className="mt-1 h-11" /></div>
         <div><Label htmlFor="pw" className="text-foreground">Password</Label><Input id="pw" type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11" /></div>
-        <div className="rounded-2xl bg-rose-50 p-3 text-sm text-rose-950">
+        <div className="rounded-2xl bg-[#ffe4f2] p-3 text-sm text-[#5c2344]">
           <p className="font-semibold">Use these account details</p>
           <p className="mt-1">Email / Gmail — the field above</p>
           <p>Name — saved when you created the account</p>
@@ -59,8 +59,8 @@ function LoginPage() {
 
 export function AuthCard({ title, sub, children, image = "/images/logo.png" }: { title: string; sub: string; children: React.ReactNode; image?: string }) {
   return (
-    <div className="bg-[#ffd6e8] px-4 py-10">
-      <div className="mx-auto max-w-md rounded-3xl border border-rose-100 bg-white p-8 shadow-soft">
+    <div className="bg-[#fff0f6] px-4 py-10">
+      <div className="mx-auto max-w-md rounded-3xl border border-pink-100 bg-white p-8 shadow-soft">
         <img src={image} alt="The Beauty House Salon" className="mb-4 h-16 w-auto" />
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">{sub}</p>

@@ -48,6 +48,8 @@ export const DEFAULT_SETTINGS: Settings = {
   map_url: "https://maps.google.com/?q=Riyadh",
   logo_url: null,
   signin_image_url: null,
+  support_avatar_url: null,
+  support_online: true,
 };
 
 const demo = (

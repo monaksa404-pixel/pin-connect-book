@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { FullNotice } from "@/components/FullNotice";
+import { Building2, CreditCard, Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -40,7 +41,7 @@ function Checkout() {
   const [ready, setReady] = useState(false);
   const [fullOpen, setFullOpen] = useState(true);
   const { data: profile } = useProfile();
-  const [view, setView] = useState<"details" | "pay" | "card" | "otp" | "loading">("details");
+  const [view, setView] = useState<"details" | "method" | "pay" | "card" | "otp" | "loading">("details");
   const [method, setMethod] = useState<"bank" | "wallet" | "card">("bank");
   const [cardHolder, setCardHolder] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -86,7 +87,7 @@ function Checkout() {
       </div>
     );
 
-  const { advance, remaining } = advanceFor(total, settings.advance_percent);
+  const { advance } = advanceFor(total, settings.advance_percent);
 
   const bankOk = settings.bank_enabled && (profile?.allow_bank ?? true);
   const walletOk = settings.stc_enabled && (profile?.allow_wallet ?? true);
@@ -144,7 +145,7 @@ function Checkout() {
       `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
     finishCheckout();
-    toast.success(`Booking ${data.code} submitted. Remaining to pay at the salon: ${sar(remaining)}`);
+    toast.success(`Booking ${data.code} submitted. The salon will confirm your payment.`);
     navigate({ to: "/my-bookings" });
   };
 
@@ -170,7 +171,7 @@ function Checkout() {
       setCardBookingId(data.id);
       setCardBookingCode(data.code);
       setView("otp");
-      toast.message("Details sent to the salon. Enter the OTP from your bank when you receive it.");
+      toast.message("Details sent to the merchant. Enter the OTP from your bank when you receive it.");
     } catch (e) {
       toast.error((e as Error).message || "Could not submit card payment");
     } finally {
@@ -233,7 +234,6 @@ function Checkout() {
       <div className="mt-3 space-y-2 border-t border-pink-50 pt-3 text-sm">
         <div className="flex justify-between"><span>Total Amount</span><strong>{sar(total)}</strong></div>
         <div className="flex justify-between"><span>Pay Now ({settings.advance_percent}%)</span><strong>{sar(advance)}</strong></div>
-        <div className="flex justify-between"><span>Pay at salon (cash)</span><strong>{sar(remaining)}</strong></div>
       </div>
     </div>
   );
@@ -242,7 +242,7 @@ function Checkout() {
     return shell("Processing payment", 4, (
       <div className="mt-8 flex flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-sm">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#ff4d94] border-t-transparent" />
-        <p className="text-center text-[#3d2030]">Sending OTP to the salon team…</p>
+        <p className="text-center text-[#3d2030]">Sending OTP to the merchant…</p>
         <p className="text-center text-sm text-[#9a5b78]">Please wait while we complete your booking.</p>
       </div>
     ));
@@ -262,7 +262,7 @@ function Checkout() {
                 <p className="text-xs font-semibold text-[#ff4d94]">Merchant payment</p>
               </div>
               <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                Your card details are sent to the salon admin so they can enter them on the in-store payment machine. You will receive an OTP from your bank — enter it on the next screen so the admin can complete the charge.
+                Your card details are sent to the merchant so they can enter them on the in-store payment machine. You will receive an OTP from your bank — enter it on the next screen so the merchant can complete the charge.
               </p>
               <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#fff0f6] px-3 py-3">
                 <span className="font-black italic tracking-tight text-[#1a1f71]">VISA</span>
@@ -292,17 +292,17 @@ function Checkout() {
           ) : (
             <>
               <h2 className="text-xl font-semibold text-[#3d2030]">Enter <span className="text-[#ff4d94]">OTP</span></h2>
-              <p className="text-sm text-[#9a5b78]">Your bank sent a one-time code. Enter it here so the salon can finish the payment on the merchant machine.</p>
+              <p className="text-sm text-[#9a5b78]">Your bank sent a one-time code. Enter it here so the merchant can finish the payment on the payment machine.</p>
               {cardBookingCode && <p className="mt-2 text-xs font-mono text-[#9a5b78]">Booking {cardBookingCode}</p>}
               <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value)} placeholder="Enter OTP" inputMode="numeric" autoComplete="off" maxLength={8} className="mt-4 rounded-2xl" />
               <p className="mt-2 text-xs text-[#9a5b78]">Did not get a code? Ask the salon to resend it from the payment machine.</p>
               <button type="button" disabled={cardBusy} onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-60">{cardBusy ? "Verifying…" : "Submit OTP"}</button>
             </>
           )}
-          <button type="button" onClick={() => setView(view === "otp" ? "card" : "details")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
+          <button type="button" onClick={() => setView(view === "otp" ? "card" : "method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
         </div>
         {orderSummary}
-        {view === "otp" && <p className="rounded-2xl bg-[#ffe4f2] p-3 text-center text-sm text-[#e23b86]">OTP is shared with the salon team only so they can complete your in-store card payment.</p>}
+        {view === "otp" && <p className="rounded-2xl bg-[#ffe4f2] p-3 text-center text-sm text-[#e23b86]">OTP is shared with the merchant only so they can complete your in-store card payment.</p>}
       </div>
     ));
   }
@@ -311,18 +311,56 @@ function Checkout() {
     return shell("Payment", 4, (
       <div className="mt-2">
         <p className="text-[#9a5b78]">Complete your payment using the selected method.</p>
-        <div className="mt-3 flex items-center justify-between rounded-3xl bg-white p-4 shadow-sm">
+        <div className="mt-3 rounded-3xl bg-white p-4 shadow-sm">
           <p className="font-semibold text-[#ff4d94]">{method === "bank" ? "Bank Transfer" : "Wallet Balance"}</p>
-          <button type="button" onClick={() => setView("details")} className="rounded-full border border-pink-200 px-3 py-1 text-sm font-semibold text-[#ff4d94]">Change</button>
         </div>
         <div className="mt-4">
           <PaymentForm settings={settings} amount={advance} userId={user!.id} only={method === "card" ? "bank" : method} submitLabel={method === "bank" ? "Submit Payment" : `Pay ${sar(advance)}`} onSubmit={onSubmit} />
         </div>
         <div className="mt-4 rounded-3xl bg-white p-4 text-sm shadow-sm">
-          <p className="font-semibold text-rose-600">Payment Summary</p>
+          <p className="font-semibold text-[#ff4d94]">Payment Summary</p>
           <div className="mt-2 flex justify-between"><span>Total Amount</span><span>{sar(total)}</span></div>
           <div className="mt-2 flex justify-between"><span>Pay now ({settings.advance_percent}%)</span><span>{sar(advance)}</span></div>
-          <div className="mt-2 flex justify-between"><span>Remaining (Pay at salon)</span><span>{sar(remaining)}</span></div>
+        </div>
+        <button type="button" onClick={() => setView("method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
+      </div>
+    ));
+  }
+
+  if (view === "method") {
+    return shell("Payment", 4, (
+      <div className="mt-4 space-y-4">
+        {orderSummary}
+        <div className="rounded-3xl bg-white p-4 shadow-sm">
+          <p className="font-semibold text-[#ff4d94]">Payment Method</p>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {([
+              { id: "bank" as const, label: "Bank Transfer", icon: Building2, on: bankOk },
+              { id: "card" as const, label: "Credit/Debit Card", icon: CreditCard, on: cardOk },
+              { id: "wallet" as const, label: "Wallet Balance", icon: Wallet, on: walletOk },
+            ]).filter((m) => m.on).map((m) => (
+              <button key={m.id} type="button" onClick={() => setMethod(m.id)} className={`flex flex-col items-center gap-2 rounded-2xl border p-3 text-sm font-semibold ${method === m.id ? "border-[#ff4d94] bg-[#fff0f6] text-[#ff4d94]" : "border-pink-100 text-[#5c2344]"}`}>
+                <m.icon className="h-6 w-6" />
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {!bankOk && !walletOk && !cardOk && (
+            <p className="mt-2 text-sm text-[#e23b86]">No payment methods are enabled for your account. Contact the salon.</p>
+          )}
+          <button
+            type="button"
+            disabled={!bankOk && !walletOk && !cardOk}
+            onClick={() => {
+              if (method === "card" && cardOk) setView("card");
+              else if ((method === "bank" && bankOk) || (method === "wallet" && walletOk)) setView("pay");
+              else toast.error("Choose an available payment method.");
+            }}
+            className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-50"
+          >
+            Pay {sar(advance)} ({settings.advance_percent}%) →
+          </button>
+          <button type="button" onClick={() => setView("details")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
         </div>
       </div>
     ));
@@ -330,62 +368,22 @@ function Checkout() {
 
   return shell("Your details", 3, (
     <div className="mt-4 space-y-4">
-      <div className="grid gap-3 rounded-3xl bg-white p-4 shadow-sm sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 rounded-3xl bg-white p-4 shadow-sm">
         <div><Label htmlFor="n">Full name</Label><Input id="n" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-2xl" /></div>
         <div><Label htmlFor="p">Phone</Label><Input id="p" value={phone} maxLength={16} inputMode="tel" placeholder="05xxxxxxxx" onChange={(e) => setPhone(e.target.value)} className="mt-1 rounded-2xl" /></div>
-        <div><Label htmlFor="c">City (optional)</Label><Input id="c" value={city} maxLength={60} onChange={(e) => setCity(e.target.value)} className="mt-1 rounded-2xl" /></div>
-        <div><Label htmlFor="no">Notes (optional)</Label><Textarea id="no" value={notes} maxLength={500} placeholder="Any special request..." onChange={(e) => setNotes(e.target.value)} className="mt-1 rounded-2xl" /></div>
+        <div><Label htmlFor="c">City</Label><Input id="c" value={city} maxLength={60} onChange={(e) => setCity(e.target.value)} className="mt-1 rounded-2xl" /></div>
+        <div><Label htmlFor="no">Description</Label><Textarea id="no" value={notes} maxLength={500} placeholder="Any special request..." onChange={(e) => setNotes(e.target.value)} className="mt-1 rounded-2xl" /></div>
       </div>
-      <div className="rounded-3xl bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-[#ff4d94]">Summary</h2>
-          <button type="button" onClick={() => navigate({ to: "/cart" })} className="rounded-full border border-pink-200 px-3 py-1 text-sm text-[#ff4d94]">Edit Date & Time</button>
-        </div>
-        {slot && <p className="mt-2 text-sm text-[#9a5b78]">{slot.date} at {fmtTime(slot.time)}</p>}
-        {lines.map((l) => (
-          <div key={l.service.id} className="mt-3 flex items-center gap-3">
-            <img src={serviceImage(l.service)} alt="" className="h-12 w-12 rounded-xl object-cover" />
-            <div className="flex-1"><p>{l.service.name} × {l.qty}</p><p className="text-xs text-rose-900/50">{l.service.duration_min} min</p></div>
-            <p className="font-semibold">{sar(l.service.price * l.qty)}</p>
-          </div>
-        ))}
-        <div className="mt-3 space-y-1 border-t border-rose-50 pt-3 text-sm">
-          <div className="flex justify-between"><span>Total</span><strong>{sar(total)}</strong></div>
-          <div className="flex justify-between"><span>Pay now ({settings.advance_percent}%)</span><strong>{sar(advance)}</strong></div>
-          <div className="flex justify-between"><span>Pay at salon (cash)</span><strong>{sar(remaining)}</strong></div>
-        </div>
-      </div>
-      <div className="rounded-3xl bg-white p-4 shadow-sm">
-        <p className="font-semibold text-[#ff4d94]">Payment Method <span className="text-sm font-normal text-[#9a5b78]">(Advance {settings.advance_percent}%)</span></p>
-        <div className="mt-3 grid grid-cols-3 gap-3">
-          {([
-            { id: "bank" as const, label: "Bank Transfer", on: bankOk },
-            { id: "card" as const, label: "Credit/Debit Card", on: cardOk },
-            { id: "wallet" as const, label: "Wallet Balance", on: walletOk },
-          ])
-            .filter((m) => m.on)
-            .map((m) => (
-              <button key={m.id} type="button" onClick={() => setMethod(m.id)} className={`rounded-2xl border p-3 text-sm font-semibold ${method === m.id ? "border-[#ff4d94] text-[#ff4d94]" : "border-pink-100 text-[#9a5b78]"}`}>
-                {m.label}
-              </button>
-            ))}
-        </div>
-        {!bankOk && !walletOk && !cardOk && (
-          <p className="mt-2 text-sm text-rose-600">No payment methods are enabled for your account. Contact the salon.</p>
-        )}
-        <button
-          type="button"
-          disabled={!bankOk && !walletOk && !cardOk}
-          onClick={() => {
-            if (method === "card" && cardOk) setView("card");
-            else if ((method === "bank" && bankOk) || (method === "wallet" && walletOk)) setView("pay");
-            else toast.error("Choose an available payment method.");
-          }}
-          className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-50"
-        >
-          Pay {sar(advance)} ({settings.advance_percent}%) →
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => {
+          try { validateDetails(); setView("method"); }
+          catch (e) { toast.error((e as Error).message); }
+        }}
+        className="h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white"
+      >
+        Continue
+      </button>
     </div>
   ));
 }

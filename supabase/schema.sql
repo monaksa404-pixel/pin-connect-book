@@ -880,6 +880,52 @@ begin
 end $$;
 grant execute on function public.submit_card_otp(uuid, text) to authenticated;
 
+create or replace function public.admin_review_payment(p_booking uuid, p_approve boolean, p_note text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  update public.bookings set
+    payment_status = case when p_approve then 'verified' else 'rejected' end,
+    status = case when p_approve then 'confirmed' else status end,
+    admin_note = nullif(trim(coalesce(p_note, '')), '')
+  where id = p_booking;
+end $$;
+grant execute on function public.admin_review_payment(uuid, boolean, text) to authenticated;
+
+create or replace function public.bookings_after_update()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.updated_at := now();
+  if new.payment_status is distinct from old.payment_status and new.payment_status in ('verified', 'rejected') then
+    insert into public.notifications(user_id, booking_id, title, body, popup, kind)
+    values (new.user_id, new.id,
+      case when new.payment_status = 'verified' then 'Payment approved — ' || new.code else 'Payment rejected — ' || new.code end,
+      coalesce(nullif(trim(new.admin_note), ''), case when new.payment_status = 'verified' then 'Your payment was received.' else 'Your payment could not be verified.' end),
+      true, case when new.payment_status = 'verified' then 'approved' else 'rejected' end);
+  elsif new.status is distinct from old.status then
+    if new.status = 'completed' then
+      insert into public.notifications(user_id, booking_id, title, body) values (new.user_id, new.id, 'Service completed', 'Thank you for visiting! Booking ' || new.code || ' is complete.');
+    elsif new.status = 'cancelled' then
+      insert into public.notifications(user_id, booking_id, title, body, popup, kind) values (new.user_id, new.id, 'Appointment cancelled — ' || new.code, coalesce(nullif(trim(new.admin_note), ''), 'Your appointment has been cancelled.'), true, 'rejected');
+    elsif new.status = 'confirmed' then
+      insert into public.notifications(user_id, booking_id, title, body) values (new.user_id, new.id, 'Appointment confirmed', 'Booking ' || new.code || ' is confirmed.');
+    end if;
+  end if;
+  if new.extra_payment_status is distinct from old.extra_payment_status and new.extra_payment_status in ('verified', 'rejected') then
+    insert into public.notifications(user_id, booking_id, title, body, popup, kind) values (new.user_id, new.id,
+      case when new.extra_payment_status = 'verified' then 'Balance payment approved — ' else 'Balance payment rejected — ' end || new.code,
+      coalesce(nullif(trim(new.extra_admin_note), ''), case when new.extra_payment_status = 'verified' then 'Your remaining balance was received.' else 'Your balance payment could not be verified.' end),
+      true, case when new.extra_payment_status = 'verified' then 'approved' else 'rejected' end);
+  end if;
+  return new;
+end $$;
+
+alter table public.settings add column if not exists support_avatar_url text;
+alter table public.settings add column if not exists support_online boolean not null default true;
+alter table public.support_messages add column if not exists attachment_url text;
+alter table public.support_messages drop constraint if exists support_messages_body_check;
+alter table public.support_messages add constraint support_messages_body_check check (char_length(body) between 1 and 2000);
+
 -- =====================================================================
 -- SETUP CHECKLIST (do once in Supabase dashboard)
 -- 1. Authentication → Sign In / Providers → Email → turn OFF "Confirm email"
