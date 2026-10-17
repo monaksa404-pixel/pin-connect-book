@@ -137,9 +137,11 @@ export function timeSlots(open: string, close: string, step: number): string[] {
 }
 
 export const fmtTime = (t: string) => {
-  const [h = 0, m = 0] = t.split(":").map(Number);
+  const raw = String(t).slice(0, 5);
+  const [h = 0, m = 0] = raw.split(":").map(Number);
   const ap = h >= 12 ? "PM" : "AM";
-  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${ap}`;
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ap}`;
 };
 
 export function advanceFor(total: number, pct: number) {
