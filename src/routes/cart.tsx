@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { CalendarDays, Clock, Flower2, Gift, MapPin, Minus, Plus, Scissors, ShoppingCart, Smile, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, Check, Clock, Flower2, Gift, MapPin, Minus, Plus, Scissors, ShoppingCart, Smile, Trash2, UserRound } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { advanceFor, DEFAULT_SETTINGS, fmtTime, ksaNow, sar, serviceImage, servicesQuery, settingsQuery, timeSlots } from "@/lib/data";
 import { FullNotice } from "@/components/FullNotice";
@@ -39,7 +39,20 @@ function CartPage() {
   const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : new Date());
   const [time, setTime] = useState<string | null>(slot?.time ?? null);
   const ksa = ksaNow();
-  const slots = useMemo(() => timeSlots("00:00", "24:00", settings.slot_minutes), [settings.slot_minutes]);
+  const slots = useMemo(() => {
+    const open = String(settings.open_time || "00:00").slice(0, 5);
+    let close = String(settings.close_time || "00:00").slice(0, 5);
+    const stock = (open === "10:00" && (close === "23:00" || close === "14:00")) || close === "00:00" || close === "24:00" || close <= open;
+    const start = stock ? "00:00" : open;
+    const end = stock ? "24:00" : close;
+    const all = timeSlots(start, end, 30);
+    if (!date || format(date, "yyyy-MM-dd") !== ksa.date) return all;
+    const nowMin = ksa.hour * 60 + ksa.minute;
+    return all.filter((t) => {
+      const [h = 0, m = 0] = t.split(":").map(Number);
+      return h * 60 + m > nowMin;
+    });
+  }, [date, settings.open_time, settings.close_time, ksa.date, ksa.hour, ksa.minute]);
   const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
@@ -144,22 +157,25 @@ function CartPage() {
               </div>
               <button type="button" onClick={() => setDateOpen(false)} className="text-2xl text-[#9a5b78]" aria-label="Close">×</button>
             </div>
-            <div className="mt-4 overflow-x-hidden rounded-3xl border border-pink-100 p-3">
-              <p className="mb-2 font-semibold text-[#3d2030]">Select Date</p>
-              <Calendar mode="single" selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={(d) => format(d, "yyyy-MM-dd") < ksa.date} />
-              <p className="mt-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]">Today in Saudi Arabia: {format(parseISO(ksa.date), "EEE, d MMM yyyy")} · GMT+3</p>
-            </div>
-            {date && (
-              <div className="mt-4 rounded-3xl border border-pink-100 p-3">
-                <p className="font-semibold text-[#3d2030]">Select Time</p>
-                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")} · Saudi Arabia time (KSA, GMT+3). Open 24 hours.</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="overflow-x-hidden rounded-3xl border border-pink-100 p-3">
+                <p className="mb-2 flex items-center gap-2 font-semibold text-[#3d2030]"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#ffe4f2] text-[#ff4d94]"><CalendarDays className="h-4 w-4" /></span>Select Date</p>
+                <Calendar mode="single" weekStartsOn={6} selected={date} onSelect={(d) => { setDate(d); setTime(null); }} disabled={(d) => format(d, "yyyy-MM-dd") < ksa.date} />
+                <p className="mt-2 flex items-center gap-2 rounded-xl bg-[#ffe4f2] px-3 py-2 text-sm text-[#e23b86]"><CalendarDays className="h-4 w-4" />Today: {format(parseISO(ksa.date), "EEE, d MMM yyyy")}</p>
+              </div>
+              <div className="rounded-3xl border border-pink-100 p-3">
+                <p className="flex items-center gap-2 font-semibold text-[#3d2030]"><span className="grid h-8 w-8 place-items-center rounded-xl bg-[#ffe4f2] text-[#ff4d94]"><Clock className="h-4 w-4" /></span>Select Time</p>
+                <p className="mt-2 text-xs text-[#9a5b78]">Available time slots for {date ? format(date, "EEE, d MMM yyyy") : "the selected date"}</p>
+                <div className="mt-3 grid max-h-80 grid-cols-2 gap-2 overflow-y-auto">
                   {slots.map((t) => (
-                    <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)} KSA</button>
+                    <button key={t} type="button" onClick={() => setTime(t)} className={cn("inline-flex items-center justify-center gap-1 rounded-2xl py-2.5 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>
+                      {time === t && <Check className="h-4 w-4" />}{fmtTime(t)}
+                    </button>
                   ))}
+                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">No times left today.</p>}
                 </div>
               </div>
-            )}
+            </div>
             <button
               type="button"
               disabled={!date || !time}
@@ -169,9 +185,11 @@ function CartPage() {
                 setDateOpen(false);
                 navigate({ to: "/checkout" });
               }}
-              className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-50"
+              className="relative mt-4 flex h-12 w-full items-center justify-center rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-50"
             >
-              Confirm Date & Time →
+              <CalendarDays className="absolute left-5 h-5 w-5" />
+              Confirm Date & Time
+              <span className="absolute right-5">→</span>
             </button>
           </div>
         </div>

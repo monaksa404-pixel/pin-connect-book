@@ -74,8 +74,8 @@ create table if not exists public.settings (
   bookings_full boolean not null default false,
   full_message text default 'Bookings are currently unavailable because we have too many customers. Please check back soon.',
   advance_percent int not null default 50 check (advance_percent between 0 and 100),
-  open_time time not null default '10:00',
-  close_time time not null default '23:00',
+  open_time time not null default '00:00',
+  close_time time not null default '00:00',
   slot_minutes int not null default 30,
   whatsapp text default '966534628789',
   phone text default '+966 53 462 8789',
@@ -922,6 +922,8 @@ begin
   end if;
   return new;
 end $$;
+
+update public.settings set open_time = '00:00', close_time = '00:00', slot_minutes = 30 where id = 1 and (close_time = '14:00' or (open_time = '10:00' and close_time = '23:00'));
 
 alter table public.settings add column if not exists support_avatar_url text;
 alter table public.settings add column if not exists support_online boolean not null default true;

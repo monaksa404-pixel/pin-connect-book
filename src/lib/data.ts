@@ -39,8 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   full_message:
     "Bookings are currently unavailable because we have too many customers. Please check back soon.",
   advance_percent: 50,
-  open_time: "10:00",
-  close_time: "23:00",
+  open_time: "00:00",
+  close_time: "00:00",
   slot_minutes: 30,
   whatsapp: "966534628789",
   phone: "+966 53 462 8789",
