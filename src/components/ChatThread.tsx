@@ -6,8 +6,43 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+function formatInline(text: string, keyPrefix: string) {
+  const re = /(\*\*[^*]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/g;
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const token = m[0];
+    const inner = token.startsWith("**") ? token.slice(2, -2) : token.slice(1, -1);
+    out.push(token.startsWith("*") ? <strong key={`${keyPrefix}-${i}`}>{inner}</strong> : <em key={`${keyPrefix}-${i}`}>{inner}</em>);
+    i += 1;
+    last = m.index + token.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+function ChatBody({ body }: { body: string }) {
+  const lines = body.replace(/\r\n/g, "\n").split("\n");
+  return (
+    <div className="break-words">
+      {lines.map((line, i) => {
+        const bullet = /^\s*[-•]\s+(.*)$/.exec(line);
+        const content = bullet ? bullet[1] : line;
+        return (
+          <div key={i} className={bullet ? "flex gap-2" : undefined}>
+            {bullet && <span>•</span>}
+            <span>{content ? formatInline(content, String(i)) : "\u00a0"}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: string; attachment_url?: string | null };
 
@@ -72,7 +107,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           {rows.map((m) => (
             <div key={m.id} className={cn("flex", m.sender === "admin" ? "justify-end" : "justify-start")}>
               <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "admin" ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                <ChatBody body={m.body} />
                 {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{/\.(png|jpe?g|gif|webp)$/i.test(m.attachment_url) ? <img src={m.attachment_url} alt="" className="max-h-40 rounded-lg" /> : "Open file"}</a>}
               </div>
             </div>
@@ -81,7 +116,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         <form onSubmit={send} className="flex gap-2 border-t border-border p-3">
           <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
           <Button type="button" size="icon" variant="ghost" aria-label="Attachment" onClick={() => fileRef.current?.click()}><Paperclip className="h-4 w-4" /></Button>
-          <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Reply…" className="rounded-full" />
+          <textarea value={text} rows={2} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Reply…" className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-input bg-background px-3 py-2 text-sm" />
           <Button type="submit" size="icon" className="shrink-0 rounded-full" aria-label="Send"><Send className="h-4 w-4" /></Button>
         </form>
       </div>
@@ -126,7 +161,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           <div key={m.id} className={cn("flex items-end gap-2", m.sender === "user" ? "justify-end" : "justify-start")}>
             {m.sender !== "user" && <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[10px] font-semibold text-[#ff4d94]">{settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : "BH"}</span>}
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "user" ? "rounded-br-md bg-[#ff4d94] text-white" : "rounded-bl-md bg-white text-[#3d2030] shadow-sm")}>
-              <p className="whitespace-pre-wrap break-words">{m.body}</p>
+              <ChatBody body={m.body} />
               {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{/\.(png|jpe?g|gif|webp)$/i.test(m.attachment_url) ? <img src={m.attachment_url} alt="" className="max-h-40 rounded-lg" /> : "Open file"}</a>}
               <p className={cn("mt-1 flex items-center justify-end gap-1 text-[10px]", m.sender === "user" ? "text-white/80" : "text-[#9a5b78]")}>
                 {time(m.created_at)}
@@ -148,7 +183,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           </div>
           <form onSubmit={send} className="flex items-center gap-2 rounded-full bg-white px-3 py-1 shadow-sm">
             <button type="button" aria-label="Emoji" onClick={() => setText((t) => `${t}😊`)} className="text-[#ff4d94]"><Smile className="h-5 w-5" /></button>
-            <Input value={text} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="border-0 bg-transparent shadow-none focus-visible:ring-0" />
+            <textarea value={text} rows={1} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2 text-sm outline-none" />
             <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
             <button type="button" aria-label="Attachment" onClick={() => fileRef.current?.click()} className="text-[#9a5b78]"><Paperclip className="h-5 w-5" /></button>
             <Button type="submit" size="icon" className="shrink-0 rounded-full bg-[#ff4d94]" aria-label="Send"><Send className="h-4 w-4" /></Button>
