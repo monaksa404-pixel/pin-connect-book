@@ -113,20 +113,14 @@ export const servicesQuery = queryOptions({
 export const sar = (n: number) => `${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })} SAR`;
 
 export function ksaNow(d = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Riyadh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
-  let hour = Number(get("hour"));
+  const shifted = new Date(d.getTime() + 3 * 60 * 60 * 1000);
+  let hour = shifted.getUTCHours();
   if (hour === 24) hour = 0;
-  const minute = Number(get("minute"));
-  return { date: `${get("year")}-${get("month")}-${get("day")}`, hour, minute };
+  return {
+    date: shifted.toISOString().slice(0, 10),
+    hour,
+    minute: shifted.getUTCMinutes(),
+  };
 }
 
 export function timeSlots(open: string, close: string, step: number): string[] {
@@ -134,8 +128,9 @@ export function timeSlots(open: string, close: string, step: number): string[] {
     const [h = 0, m = 0] = t.split(":").map(Number);
     return h * 60 + (m || 0);
   };
+  const gap = Number(step) || 30;
   const out: string[] = [];
-  for (let t = toMin(open); t + step <= toMin(close); t += step) {
+  for (let t = toMin(open); t + gap <= toMin(close); t += gap) {
     out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
   }
   return out;

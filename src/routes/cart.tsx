@@ -160,12 +160,12 @@ function CartPage() {
             {date && (
               <div className="mt-4 rounded-3xl border border-pink-100 p-3">
                 <p className="font-semibold text-[#3d2030]">Select Time</p>
-                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")} · Saudi Arabia time (KSA, GMT+3)</p>
+                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")} · Saudi Arabia time (KSA, GMT+3). Now {fmtTime(`${String(ksa.hour).padStart(2, "0")}:${String(ksa.minute).padStart(2, "0")}`)} KSA. Open {fmtTime(settings.open_time.slice(0, 5))}–{fmtTime(settings.close_time.slice(0, 5))}.</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {slots.map((t) => (
-                    <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)}</button>
+                    <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)} KSA</button>
                   ))}
-                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">No times left today.</p>}
+                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">{format(date, "yyyy-MM-dd") === ksa.date ? `No times left after ${fmtTime(`${String(ksa.hour).padStart(2, "0")}:${String(ksa.minute).padStart(2, "0")}`)} KSA. The salon closes at ${fmtTime(settings.close_time.slice(0, 5))}.` : "No times for this day."}</p>}
                 </div>
               </div>
             )}
