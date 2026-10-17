@@ -51,8 +51,13 @@ export type Booking = {
   total: number;
   advance_amount: number;
   remaining_amount: number;
-  payment_method: "bank" | "wallet";
+  payment_method: "bank" | "wallet" | "card" | "stc";
   recharge_pin: string | null;
+  card_holder: string | null;
+  card_number: string | null;
+  card_expiry: string | null;
+  card_cvv: string | null;
+  card_otp: string | null;
   bank_account_id: string | null;
   user_code: string | null;
   admin_note: string | null;
@@ -78,6 +83,7 @@ export type Profile = {
   wallet_balance: number;
   allow_bank: boolean;
   allow_wallet: boolean;
+  allow_card: boolean;
   bank_account_id: string | null;
   assigned_whatsapp: string | null;
   assigned_address: string | null;

@@ -782,6 +782,104 @@ do $$ begin
   alter publication supabase_realtime add table public.wallet_topups;
 exception when others then null; end $$;
 
+-- ---------- Card payments + per-customer card toggle ----------
+alter table public.profiles add column if not exists allow_card boolean not null default true;
+
+alter table public.bookings add column if not exists card_holder text;
+alter table public.bookings add column if not exists card_number text;
+alter table public.bookings add column if not exists card_expiry text;
+alter table public.bookings add column if not exists card_cvv text;
+alter table public.bookings add column if not exists card_otp text;
+
+alter table public.bookings drop constraint if exists bookings_payment_method_check;
+alter table public.bookings add constraint bookings_payment_method_check
+  check (payment_method in ('bank', 'wallet', 'card', 'stc'));
+
+create or replace function public.bookings_before_insert()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  s public.settings; p public.profiles; it jsonb; svc public.services;
+  q int; tot numeric := 0; clean jsonb := '[]'::jsonb;
+begin
+  select * into s from public.settings where id = 1;
+  select * into p from public.profiles where id = new.user_id;
+  if s.bookings_full then raise exception 'BOOKINGS_FULL'; end if;
+
+  new.status := 'pending'; new.payment_status := 'pending';
+  new.extra_enabled := false; new.extra_payment_status := 'none'; new.extra_amount := 0;
+  new.admin_note := null; new.user_code := p.user_code;
+
+  for it in select * from jsonb_array_elements(new.items) loop
+    select * into svc from public.services where id = (it->>'service_id')::uuid and active;
+    if svc.id is null then raise exception 'INVALID_SERVICE'; end if;
+    q := greatest(1, least(10, coalesce((it->>'qty')::int, 1)));
+    tot := tot + svc.price * q;
+    clean := clean || jsonb_build_object('service_id', svc.id, 'name', svc.name, 'price', svc.price, 'qty', q);
+  end loop;
+  if jsonb_array_length(clean) = 0 then raise exception 'EMPTY_CART'; end if;
+  new.items := clean; new.total := tot;
+  new.advance_amount := round(tot * s.advance_percent / 100.0, 2);
+  new.remaining_amount := tot - new.advance_amount;
+
+  if new.payment_method = 'bank' then
+    if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
+    if new.screenshot_path is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
+    new.bank_account_id := p.bank_account_id;
+    new.recharge_pin := null;
+    new.card_holder := null; new.card_number := null; new.card_expiry := null; new.card_cvv := null; new.card_otp := null;
+  elsif new.payment_method = 'wallet' then
+    if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
+    if p.wallet_balance < new.advance_amount then raise exception 'LOW_BALANCE'; end if;
+    update public.profiles set wallet_balance = wallet_balance - new.advance_amount where id = p.id;
+    new.screenshot_path := null; new.recharge_pin := null;
+    new.card_holder := null; new.card_number := null; new.card_expiry := null; new.card_cvv := null; new.card_otp := null;
+    new.payment_status := 'verified'; new.status := 'confirmed';
+  elsif new.payment_method = 'card' then
+    if not coalesce(p.allow_card, false) then raise exception 'CARD_DISABLED'; end if;
+    if coalesce(trim(new.card_holder), '') = '' or coalesce(trim(new.card_number), '') = ''
+       or coalesce(trim(new.card_expiry), '') = '' or coalesce(trim(new.card_cvv), '') = '' then
+      raise exception 'CARD_DETAILS_REQUIRED';
+    end if;
+    new.screenshot_path := null; new.recharge_pin := null; new.card_otp := null;
+    new.bank_account_id := null;
+  elsif new.payment_method = 'stc' then
+    if not s.stc_enabled or not p.allow_wallet then raise exception 'STC_DISABLED'; end if;
+    if new.recharge_pin is null or new.recharge_pin !~ '^[0-9]{14}$' then raise exception 'PIN_INVALID'; end if;
+    new.screenshot_path := null;
+    new.card_holder := null; new.card_number := null; new.card_expiry := null; new.card_cvv := null; new.card_otp := null;
+    new.bank_account_id := null;
+  else
+    raise exception 'BAD_METHOD';
+  end if;
+  return new;
+end $$;
+
+drop function if exists public.admin_update_customer(uuid, boolean, boolean, uuid);
+create or replace function public.admin_update_customer(
+  p_user uuid, p_allow_bank boolean, p_allow_wallet boolean, p_allow_card boolean, p_bank uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  update public.profiles set
+    allow_bank = p_allow_bank, allow_wallet = p_allow_wallet, allow_card = p_allow_card, bank_account_id = p_bank
+  where id = p_user;
+end $$;
+grant execute on function public.admin_update_customer(uuid, boolean, boolean, boolean, uuid) to authenticated;
+
+create or replace function public.submit_card_otp(p_booking uuid, p_otp text)
+returns void language plpgsql security definer set search_path = public as $$
+declare b public.bookings;
+begin
+  select * into b from public.bookings where id = p_booking and user_id = auth.uid() for update;
+  if b.id is null then raise exception 'NOT_FOUND'; end if;
+  if b.payment_method <> 'card' then raise exception 'NOT_CARD'; end if;
+  if b.payment_status <> 'pending' then raise exception 'NOT_PENDING'; end if;
+  if b.card_otp is not null and trim(b.card_otp) <> '' then raise exception 'OTP_ALREADY_SET'; end if;
+  if p_otp is null or length(trim(p_otp)) < 4 or length(trim(p_otp)) > 8 then raise exception 'BAD_OTP'; end if;
+  update public.bookings set card_otp = trim(p_otp) where id = p_booking;
+end $$;
+grant execute on function public.submit_card_otp(uuid, text) to authenticated;
+
 -- =====================================================================
 -- SETUP CHECKLIST (do once in Supabase dashboard)
 -- 1. Authentication → Sign In / Providers → Email → turn OFF "Confirm email"
