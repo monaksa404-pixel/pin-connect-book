@@ -39,15 +39,7 @@ function CartPage() {
   const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : new Date());
   const [time, setTime] = useState<string | null>(slot?.time ?? null);
   const ksa = ksaNow();
-  const slots = useMemo(() => {
-    const all = timeSlots(settings.open_time.slice(0, 5), settings.close_time.slice(0, 5), settings.slot_minutes);
-    if (!date || format(date, "yyyy-MM-dd") !== ksa.date) return all;
-    const nowMin = ksa.hour * 60 + ksa.minute;
-    return all.filter((t) => {
-      const [h = 0, m = 0] = t.split(":").map(Number);
-      return h * 60 + m > nowMin;
-    });
-  }, [date, settings, ksa.date, ksa.hour, ksa.minute]);
+  const slots = useMemo(() => timeSlots("00:00", "24:00", settings.slot_minutes), [settings.slot_minutes]);
   const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
@@ -160,12 +152,11 @@ function CartPage() {
             {date && (
               <div className="mt-4 rounded-3xl border border-pink-100 p-3">
                 <p className="font-semibold text-[#3d2030]">Select Time</p>
-                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")} · Saudi Arabia time (KSA, GMT+3). Now {fmtTime(`${String(ksa.hour).padStart(2, "0")}:${String(ksa.minute).padStart(2, "0")}`)} KSA. Open {fmtTime(settings.open_time.slice(0, 5))}–{fmtTime(settings.close_time.slice(0, 5))}.</p>
+                <p className="text-xs text-[#9a5b78]">Available time slots for {format(date, "EEE, d MMM yyyy")} · Saudi Arabia time (KSA, GMT+3). Open 24 hours.</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {slots.map((t) => (
                     <button key={t} type="button" onClick={() => setTime(t)} className={cn("rounded-full py-2 text-sm font-semibold", time === t ? "bg-[#ff4d94] text-white" : "bg-[#ffe4f2] text-[#e23b86]")}>{fmtTime(t)} KSA</button>
                   ))}
-                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">{format(date, "yyyy-MM-dd") === ksa.date ? `No times left after ${fmtTime(`${String(ksa.hour).padStart(2, "0")}:${String(ksa.minute).padStart(2, "0")}`)} KSA. The salon closes at ${fmtTime(settings.close_time.slice(0, 5))}.` : "No times for this day."}</p>}
                 </div>
               </div>
             )}

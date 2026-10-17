@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { settingsQuery, fmtTime } from "@/lib/data";
+import { settingsQuery } from "@/lib/data";
 
 export function SiteFooter() {
   const { data: s } = useQuery(settingsQuery);
@@ -14,11 +14,7 @@ export function SiteFooter() {
         <div className="text-sm">
           <p className="font-semibold">Visit us</p>
           <p className="mt-2 text-muted-foreground">{s?.address}</p>
-          {s && (
-            <p className="mt-1 text-muted-foreground">
-              Daily {fmtTime(s.open_time)} – {fmtTime(s.close_time)}
-            </p>
-          )}
+          <p className="mt-1 text-muted-foreground">Open 24 hours</p>
         </div>
         <div className="flex flex-col gap-2 text-sm">
           <Link to="/services" className="text-muted-foreground hover:text-foreground">Services</Link>

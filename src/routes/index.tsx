@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Clock, Flame, Flower2, Gift, Heart, LayoutGrid, Scissors, ShoppingCart, Smile, UserRound } from "lucide-react";
 import { FullNotice } from "@/components/FullNotice";
-import { categoryImage, fmtTime, mediaUrl, sar, serviceImage, servicesQuery, settingsQuery, slidersQuery, DEFAULT_SETTINGS } from "@/lib/data";
+import { categoryImage, mediaUrl, sar, serviceImage, servicesQuery, settingsQuery, slidersQuery, DEFAULT_SETTINGS } from "@/lib/data";
 import { useCart } from "@/lib/cart";
 import { toast } from "sonner";
 
@@ -124,7 +124,7 @@ function Index() {
         </div>
 
         <p className="mt-8 hidden items-center justify-center gap-6 text-sm text-[#9a5b78] md:flex">
-          <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-[#ff4d94]" />{fmtTime(settings.open_time)} – {fmtTime(settings.close_time)}</span>
+          <span className="flex items-center gap-2"><Clock className="h-4 w-4 text-[#ff4d94]" />Open 24 hours</span>
           <span>{settings.address}</span>
         </p>
         <div className="mt-6 hidden gap-3 md:grid md:grid-cols-4">
