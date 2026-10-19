@@ -123,14 +123,30 @@ export function ksaNow(d = new Date()) {
   };
 }
 
-export function timeSlots(open: string, close: string, step: number): string[] {
-  const toMin = (t: string) => {
-    const [h = 0, m = 0] = t.split(":").map(Number);
-    return h * 60 + (m || 0);
-  };
-  const gap = Number(step) || 30;
+function clockMinutes(raw: string) {
+  const m = String(raw ?? "").match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h === 24 && min === 0) return 24 * 60;
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+export function timeSlots(open: string, close: string): string[] {
+  const gap = 30;
+  const startMin = clockMinutes(open);
+  const endMin = clockMinutes(close);
+  const oldDefault = startMin === 10 * 60 && (endMin === 14 * 60 || endMin === 23 * 60);
+  const fullDay = startMin == null || endMin == null || endMin <= startMin || oldDefault;
+  const from = fullDay ? 0 : startMin;
+  const to = fullDay ? 24 * 60 : endMin;
   const out: string[] = [];
-  for (let t = toMin(open); t + gap <= toMin(close); t += gap) {
+  for (let t = from; t + gap <= to; t += gap) {
+    out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+  }
+  if (out.length) return out;
+  for (let t = 0; t < 24 * 60; t += 30) {
     out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
   }
   return out;

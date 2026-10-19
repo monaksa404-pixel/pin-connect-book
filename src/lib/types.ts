@@ -90,9 +90,15 @@ export type Profile = {
   assigned_whatsapp: string | null;
   assigned_address: string | null;
   assigned_map_url: string | null;
+  location_id: string | null;
+  whatsapp_id: string | null;
   contact_enabled: boolean;
+  chat_language?: string | null;
   created_at: string;
 };
+
+export type SalonLocation = { id: string; city: string; address: string | null; map_url: string | null; active: boolean };
+export type WhatsappNumber = { id: string; label: string | null; phone: string; active: boolean };
 
 export type BankAccount = {
   id: string;

@@ -15,7 +15,7 @@ export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
       { title: "Create Account — The Beauty House" },
-      { name: "description", content: "Create an account with your name, phone, email and password." },
+      { name: "description", content: "Create an account with your name, mobile number, city and password." },
     ],
   }),
   component: SignupPage,
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/signup")({
 
 function SignupPage() {
   const navigate = useNavigate();
-  const [f, setF] = useState({ name: "", phone: "", email: "", password: "" });
+  const [f, setF] = useState({ name: "", phone: "", city: "", password: "" });
   const [busy, setBusy] = useState(false);
   const { data: settings } = useQuery(settingsQuery);
   const signImage = mediaUrl(settings?.signin_image_url);
@@ -33,25 +33,27 @@ function SignupPage() {
     e.preventDefault();
     if (!isSupabaseConfigured) { toast.error("Database is not connected yet."); return; }
     if (f.name.trim().length < 2) { toast.error("Enter your full name."); return; }
+    if (f.city.trim().length < 2) { toast.error("Enter your city."); return; }
     if (f.password.length < 6) { toast.error("Password must be at least 6 characters."); return; }
     setBusy(true);
-    const created = await createAccount({ data: { name: f.name.trim(), phone: f.phone.trim(), email: f.email.trim(), password: f.password } });
+    const created = await createAccount({ data: { name: f.name.trim(), phone: f.phone.trim(), city: f.city.trim(), password: f.password } });
     if (!created.ok) { setBusy(false); toast.error(friendlyError({ message: created.error })); return; }
-    const { data: session, error } = await supabase.auth.signInWithPassword({ email: f.email.trim(), password: f.password });
+    const { data: session, error } = await supabase.auth.signInWithPassword({ email: created.email, password: f.password });
     if (error || !session.user) { setBusy(false); toast.error(friendlyError(error)); return; }
+    await supabase.from("profiles").update({ city: f.city.trim(), phone: f.phone.trim(), full_name: f.name.trim() }).eq("id", session.user.id);
     const { data: profile } = await supabase.from("profiles").select("user_code").eq("id", session.user.id).maybeSingle();
-    await sendAlert("new_user", `New user registered\nName: ${f.name.trim()}\nPhone: ${f.phone.trim()}\nUser ID: ${profile?.user_code ?? ""}`);
+    await sendAlert("new_user", `New user registered\nName: ${f.name.trim()}\nPhone: ${f.phone.trim()}\nCity: ${f.city.trim()}\nUser ID: ${profile?.user_code ?? ""}`);
     setBusy(false);
     toast.success("Account created");
     navigate({ to: "/" });
   };
 
   return (
-    <AuthCard title="Create account" sub="Sign up with your details, then sign in any time with the same email." image={signImage}>
+    <AuthCard title="Create account" sub="Sign up with your name, mobile number and city. Sign in later with the same mobile number." image={signImage}>
       <form onSubmit={submit} className="space-y-4">
-        <div><Label htmlFor="n" className="text-foreground">Full name</Label><Input id="n" required maxLength={80} autoComplete="name" value={f.name} onChange={set("name")} className="mt-1 h-11" /></div>
+        <div><Label htmlFor="n" className="text-foreground">Name</Label><Input id="n" required maxLength={80} autoComplete="name" value={f.name} onChange={set("name")} className="mt-1 h-11" /></div>
         <div><Label htmlFor="ph" className="text-foreground">Mobile number</Label><Input id="ph" required maxLength={16} inputMode="tel" autoComplete="tel" placeholder="05xxxxxxxx" value={f.phone} onChange={set("phone")} className="mt-1 h-11" /></div>
-        <div><Label htmlFor="e" className="text-foreground">Email / Gmail</Label><Input id="e" type="email" required autoComplete="email" value={f.email} onChange={set("email")} className="mt-1 h-11" /></div>
+        <div><Label htmlFor="c" className="text-foreground">City</Label><Input id="c" required maxLength={80} autoComplete="address-level2" value={f.city} onChange={set("city")} className="mt-1 h-11" /></div>
         <div><Label htmlFor="pw" className="text-foreground">Password</Label><Input id="pw" type="password" required minLength={6} autoComplete="new-password" value={f.password} onChange={set("password")} className="mt-1 h-11" /></div>
         <Button disabled={busy} className="h-12 w-full rounded-full">{busy ? "Creating…" : "Create account"}</Button>
       </form>

@@ -439,8 +439,8 @@ where not exists (select 1 from public.bank_accounts);
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, full_name, phone, user_code, bank_account_id)
-  values (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone',
+  insert into public.profiles (id, full_name, phone, city, user_code, bank_account_id)
+  values (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'phone', nullif(trim(new.raw_user_meta_data->>'city'), ''),
           'BHS-U' || nextval('public.user_code_seq'),
           (select id from public.bank_accounts where active order by created_at limit 1))
   on conflict (id) do nothing;
@@ -684,6 +684,10 @@ returns text language sql stable security definer set search_path = public as $$
       select u.email::text from auth.users u
       join public.profiles p on p.id = u.id
       where upper(p.user_code) = upper(trim(p_login))
+         or (
+           regexp_replace(trim(p_login), '\D', '', 'g') <> ''
+           and regexp_replace(coalesce(p.phone, ''), '\D', '', 'g') = regexp_replace(trim(p_login), '\D', '', 'g')
+         )
       limit 1
     )
   end
@@ -924,6 +928,67 @@ begin
 end $$;
 
 update public.settings set open_time = '00:00', close_time = '00:00', slot_minutes = 30 where id = 1 and (close_time = '14:00' or (open_time = '10:00' and close_time = '23:00'));
+
+drop policy if exists "media chat upload" on storage.objects;
+create policy "media chat upload" on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'media'
+    and (storage.foldername(name))[1] = 'chat'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+create table if not exists public.salon_locations (
+  id uuid primary key default gen_random_uuid(),
+  city text not null,
+  address text,
+  map_url text,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create table if not exists public.whatsapp_numbers (
+  id uuid primary key default gen_random_uuid(),
+  label text,
+  phone text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table public.salon_locations enable row level security;
+alter table public.whatsapp_numbers enable row level security;
+drop policy if exists "locations admin" on public.salon_locations;
+create policy "locations admin" on public.salon_locations for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "whatsapp admin" on public.whatsapp_numbers;
+create policy "whatsapp admin" on public.whatsapp_numbers for all to authenticated
+  using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+grant select, insert, update, delete on public.salon_locations, public.whatsapp_numbers to authenticated;
+
+alter table public.profiles add column if not exists chat_language text;
+grant update (chat_language) on public.profiles to authenticated;
+
+alter table public.profiles add column if not exists location_id uuid references public.salon_locations(id) on delete set null;
+alter table public.profiles add column if not exists whatsapp_id uuid references public.whatsapp_numbers(id) on delete set null;
+
+create or replace function public.admin_assign_place(p_user uuid, p_location uuid, p_whatsapp uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare loc public.salon_locations; num public.whatsapp_numbers;
+begin
+  if not public.has_role(auth.uid(), 'admin') then raise exception 'FORBIDDEN'; end if;
+  if p_location is not null then
+    select * into loc from public.salon_locations where id = p_location;
+  end if;
+  if p_whatsapp is not null then
+    select * into num from public.whatsapp_numbers where id = p_whatsapp;
+  end if;
+  update public.profiles set
+    location_id = p_location,
+    whatsapp_id = p_whatsapp,
+    contact_enabled = p_location is not null or p_whatsapp is not null,
+    assigned_address = case when p_location is null then null else concat_ws(', ', loc.city, nullif(loc.address, '')) end,
+    assigned_map_url = case when p_location is null then null else loc.map_url end,
+    assigned_whatsapp = case when p_whatsapp is null then null else num.phone end
+  where id = p_user;
+end $$;
+grant execute on function public.admin_assign_place(uuid, uuid, uuid) to authenticated;
 
 alter table public.settings add column if not exists support_avatar_url text;
 alter table public.settings add column if not exists support_online boolean not null default true;

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import ISO6391 from "iso-639-1";
 import { CalendarDays, CheckCheck, CreditCard, HelpCircle, MapPin, Paperclip, Send, Smile, Tag } from "lucide-react";
 import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
 import { toast } from "sonner";
@@ -8,40 +9,33 @@ import { sendAlert } from "@/lib/alerts";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-function formatInline(text: string, keyPrefix: string) {
-  const re = /(\*\*[^*]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/g;
-  const out: React.ReactNode[] = [];
-  let last = 0;
-  let i = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const token = m[0];
-    const inner = token.startsWith("**") ? token.slice(2, -2) : token.slice(1, -1);
-    out.push(token.startsWith("*") ? <strong key={`${keyPrefix}-${i}`}>{inner}</strong> : <em key={`${keyPrefix}-${i}`}>{inner}</em>);
-    i += 1;
-    last = m.index + token.length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
+function isImage(url: string) {
+  return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
 }
 
-function ChatBody({ body }: { body: string }) {
-  const lines = body.replace(/\r\n/g, "\n").split("\n");
+function MessageView({ body, attachment }: { body: string; attachment?: string | null | undefined }) {
+  const image = !!attachment && isImage(attachment);
+  const showText = !!body.trim() && body !== "." && !attachment;
   return (
-    <div className="break-words">
-      {lines.map((line, i) => {
-        const bullet = /^\s*[-•]\s+(.*)$/.exec(line);
-        const content = bullet ? bullet[1] : line;
-        return (
-          <div key={i} className={bullet ? "flex gap-2" : undefined}>
-            {bullet && <span>•</span>}
-            <span>{content ? formatInline(content, String(i)) : "\u00a0"}</span>
-          </div>
-        );
-      })}
-    </div>
+    <>
+      {showText && <p dir="auto" className="select-text whitespace-pre-wrap break-words">{body}</p>}
+      {image && <img src={attachment!} alt="" className="max-h-48 rounded-lg" />}
+      {attachment && !image && <a href={attachment} target="_blank" rel="noreferrer" className="underline">Open file</a>}
+    </>
   );
+}
+
+const RTL = new Set(["ar", "ur", "fa", "he", "ps", "sd", "dv", "yi", "ku", "ug"]);
+const FIRST = ["en", "ur", "ar"];
+const LANGUAGES = [
+  ...FIRST,
+  ...ISO6391.getAllCodes().filter((code) => !FIRST.includes(code)).sort((a, b) => ISO6391.getName(a).localeCompare(ISO6391.getName(b))),
+];
+
+function languageLabel(code: string) {
+  const native = ISO6391.getNativeName(code);
+  const english = ISO6391.getName(code);
+  return native && native !== english ? `${native} — ${english}` : english || code;
 }
 
 type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: string; attachment_url?: string | null };
@@ -49,6 +43,26 @@ type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: str
 export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin" }) {
   const qc = useQueryClient();
   const [text, setText] = useState("");
+  const [lang, setLang] = useState("en");
+  useEffect(() => {
+    const saved = localStorage.getItem("chat-language");
+    if (saved && ISO6391.validate(saved)) setLang(saved);
+  }, []);
+  const choose = (code: string) => {
+    setLang(code);
+    localStorage.setItem("chat-language", code);
+    if (as === "user" && userId) supabase.from("profiles").update({ chat_language: code }).eq("id", userId);
+  };
+  const { data: customerLang } = useQuery({
+    queryKey: ["chat-language", userId],
+    enabled: as === "admin" && !!userId,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("chat_language").eq("id", userId).maybeSingle();
+      return (data?.chat_language as string | null) || "";
+    },
+  });
+  const activeLang = as === "admin" && customerLang && ISO6391.validate(customerLang) ? customerLang : lang;
+  const dir = RTL.has(activeLang) ? "rtl" : "ltr";
   const box = useRef<HTMLDivElement>(null);
   const { data } = useQuery({
     queryKey: ["chat", userId],
@@ -67,22 +81,22 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
     const up = await supabase.storage.from("media").upload(path, file);
     if (up.error) { toast.error(up.error.message); return; }
     const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
-    const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body: file.name.slice(0, 80), attachment_url: url });
+    const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body: ".", attachment_url: url });
     if (error) { toast.error(error.message); return; }
     if (as === "user") await sendAlert("support", `New support file\n${file.name}`);
     await qc.invalidateQueries({ queryKey: ["chat", userId] });
   };
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    const body = text.trim().slice(0, 2000);
-    if (!body || !userId) return;
+    const body = text.slice(0, 2000);
+    if (!body.trim() || !userId) return;
     setText("");
     try {
       const { error } = await supabase.from("support_messages").insert({ user_id: userId, sender: as, body });
       if (error) { toast.error(error.message); setText(body); return; }
       if (as === "user") {
         const { data: who } = await supabase.from("profiles").select("full_name, user_code").eq("id", userId).maybeSingle();
-        await sendAlert("support", `New support message\nName: ${who?.full_name || "Customer"}\nUser: ${who?.user_code || ""}\n${body}`);
+        await sendAlert("support", `New support message\nName: ${who?.full_name || "Customer"}\nUser: ${who?.user_code || ""}\nLanguage: ${languageLabel(lang)}\n${body}`);
       }
       await qc.invalidateQueries({ queryKey: ["chat", userId] });
       box.current?.scrollTo({ top: box.current.scrollHeight });
@@ -103,12 +117,12 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
   if (as === "admin") {
     return (
       <div className="flex h-[60vh] flex-col rounded-3xl border border-border bg-card">
-        <div ref={box} className="flex-1 space-y-2 overflow-y-auto p-4">
+        {customerLang && ISO6391.validate(customerLang) && <p className="border-b border-border px-4 py-2 text-sm text-[#9a5b78]">Customer language: {languageLabel(customerLang)}</p>}
+        <div ref={box} className="flex-1 space-y-2 overflow-y-auto p-4" dir={dir}>
           {rows.map((m) => (
             <div key={m.id} className={cn("flex", m.sender === "admin" ? "justify-end" : "justify-start")}>
               <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "admin" ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                <ChatBody body={m.body} />
-                {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{/\.(png|jpe?g|gif|webp)$/i.test(m.attachment_url) ? <img src={m.attachment_url} alt="" className="max-h-40 rounded-lg" /> : "Open file"}</a>}
+                <MessageView body={m.body} attachment={m.attachment_url} />
               </div>
             </div>
           ))}
@@ -116,7 +130,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         <form onSubmit={send} className="flex gap-2 border-t border-border p-3">
           <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
           <Button type="button" size="icon" variant="ghost" aria-label="Attachment" onClick={() => fileRef.current?.click()}><Paperclip className="h-4 w-4" /></Button>
-          <textarea value={text} rows={2} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Reply…" className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-input bg-background px-3 py-2 text-sm" />
+          <textarea value={text} rows={2} maxLength={2000} dir={dir} lang={activeLang} onChange={(e) => setText(e.target.value)} placeholder="Reply…" className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-input bg-background px-3 py-2 text-sm" />
           <Button type="submit" size="icon" className="shrink-0 rounded-full" aria-label="Send"><Send className="h-4 w-4" /></Button>
         </form>
       </div>
@@ -135,6 +149,12 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           <p className="text-[10px] text-[#9a5b78]">Usually replies in a few minutes</p>
         </div>
       </div>
+      <label className="mb-3 block text-sm font-semibold text-[#5c2344]">
+        Chat language
+        <select value={lang} onChange={(e) => choose(e.target.value)} className="mt-1 h-11 w-full rounded-2xl border border-pink-100 bg-white px-3 text-sm font-medium text-[#3d2030]">
+          {LANGUAGES.map((code) => <option key={code} value={code}>{languageLabel(code)}</option>)}
+        </select>
+      </label>
       <div className="flex items-center gap-3 rounded-3xl bg-white p-3 shadow-sm">
         <span className="relative h-12 w-12 shrink-0">
           <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[#ff4d94]">
@@ -161,8 +181,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           <div key={m.id} className={cn("flex items-end gap-2", m.sender === "user" ? "justify-end" : "justify-start")}>
             {m.sender !== "user" && <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[10px] font-semibold text-[#ff4d94]">{settings.support_avatar_url ? <img src={settings.support_avatar_url} alt="" className="h-full w-full object-cover" /> : "BH"}</span>}
             <div className={cn("max-w-[80%] rounded-2xl px-4 py-2 text-sm", m.sender === "user" ? "rounded-br-md bg-[#ff4d94] text-white" : "rounded-bl-md bg-white text-[#3d2030] shadow-sm")}>
-              <ChatBody body={m.body} />
-              {m.attachment_url && <a href={m.attachment_url} target="_blank" rel="noreferrer" className="mt-1 block underline">{/\.(png|jpe?g|gif|webp)$/i.test(m.attachment_url) ? <img src={m.attachment_url} alt="" className="max-h-40 rounded-lg" /> : "Open file"}</a>}
+              <MessageView body={m.body} attachment={m.attachment_url} />
               <p className={cn("mt-1 flex items-center justify-end gap-1 text-[10px]", m.sender === "user" ? "text-white/80" : "text-[#9a5b78]")}>
                 {time(m.created_at)}
                 {m.sender === "user" && <CheckCheck className="h-3 w-3" />}
@@ -183,7 +202,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           </div>
           <form onSubmit={send} className="flex items-center gap-2 rounded-full bg-white px-3 py-1 shadow-sm">
             <button type="button" aria-label="Emoji" onClick={() => setText((t) => `${t}😊`)} className="text-[#ff4d94]"><Smile className="h-5 w-5" /></button>
-            <textarea value={text} rows={1} maxLength={2000} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2 text-sm outline-none" />
+            <textarea value={text} rows={1} maxLength={2000} dir={dir} lang={lang} onChange={(e) => setText(e.target.value)} placeholder={dir === "rtl" ? "اپنا پیغام لکھیں..." : "Type a message..."} className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2 text-sm outline-none" />
             <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
             <button type="button" aria-label="Attachment" onClick={() => fileRef.current?.click()} className="text-[#9a5b78]"><Paperclip className="h-5 w-5" /></button>
             <Button type="submit" size="icon" className="shrink-0 rounded-full bg-[#ff4d94]" aria-label="Send"><Send className="h-4 w-4" /></Button>

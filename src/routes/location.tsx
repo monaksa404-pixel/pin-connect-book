@@ -11,15 +11,13 @@ export const Route = createFileRoute("/location")({
   head: () => ({
     meta: [
       { title: "Salon Location — The Beauty House" },
-      { name: "description", content: "Your assigned salon location is shown after payment is approved." },
+      { name: "description", content: "Find The Beauty House Salon on the map." },
       { property: "og:title", content: "Salon Location — The Beauty House" },
       { property: "og:image", content: "https://pin-connect-book.vercel.app/images/sender.jpeg" },
     ],
   }),
   component: LocationPage,
 });
-
-const LOCKED = "Book your appointment and complete your payment to receive your assigned salon location and WhatsApp number.";
 
 function LocationPage() {
   const { user } = useAuth();
@@ -30,14 +28,13 @@ function LocationPage() {
     queryKey: ["paid-booking-row", user?.id],
     enabled: !!user && isSupabaseConfigured,
     queryFn: async () => {
-      const { data } = await supabase.from("bookings").select("code, status, booking_date, booking_time, items, payment_status").eq("payment_status", "verified").eq("status", "confirmed").order("created_at", { ascending: false }).limit(1);
+      const { data } = await supabase.from("bookings").select("code, status, booking_date, booking_time, items, payment_status").order("created_at", { ascending: false }).limit(1);
       return data?.[0] ?? null;
     },
   });
-  const open = !!user && booking?.status === "confirmed" && profile?.contact_enabled && !!(profile.assigned_address || profile.assigned_whatsapp);
-  const address = profile?.assigned_address || "";
+  const address = profile?.assigned_address || s.address || "";
   const map = profile?.assigned_map_url || "";
-  const whatsapp = (profile?.assigned_whatsapp || s.whatsapp || "").replace(/\D/g, "");
+  const whatsapp = (profile?.assigned_whatsapp || "").replace(/\D/g, "");
   const shown = whatsapp.startsWith("966") && whatsapp.length > 5
     ? `+966 ${whatsapp.slice(3, 5)} ${whatsapp.slice(5, 8)} ${whatsapp.slice(8)}`
     : whatsapp ? `+${whatsapp}` : "";
@@ -55,9 +52,7 @@ function LocationPage() {
             <p className="text-sm text-[#9a5b78]">Visit our salon at the location below or contact us on WhatsApp for any help.</p>
           </div>
         </div>
-        {!open && <p className="rounded-3xl bg-white p-4 text-sm text-[#9a5b78] shadow-sm">{LOCKED}</p>}
-        {open && booking && (
-          <>
+        {booking && (
             <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white"><CalendarDays className="h-4 w-4" /></span>
@@ -77,6 +72,8 @@ function LocationPage() {
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold capitalize text-emerald-700"><Check className="h-3.5 w-3.5" />{booking.status}</span>
               </div>
             </div>
+        )}
+        {whatsapp && (
             <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white">
@@ -100,6 +97,7 @@ function LocationPage() {
                 </div>
               )}
             </div>
+        )}
             <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white"><MapPin className="h-4 w-4" /></span>
@@ -118,8 +116,6 @@ function LocationPage() {
                 {mapsHref && <a href={mapsHref} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 font-semibold text-[#ff4d94]"><Navigation className="h-4 w-4" />Open in Maps</a>}
               </div>
             </div>
-          </>
-        )}
         <Link to="/my-bookings" className="flex h-12 items-center justify-center gap-2 rounded-full border border-pink-200 bg-white font-semibold text-[#ff4d94]">← Back to My Bookings</Link>
       </div>
     </div>

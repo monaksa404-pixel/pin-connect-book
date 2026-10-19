@@ -6,7 +6,7 @@ import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
-import type { BankAccount, Booking, Profile, Service, Settings, Topup } from "@/lib/types";
+import type { BankAccount, Booking, Profile, SalonLocation, Service, Settings, Topup, WhatsappNumber } from "@/lib/types";
 import { RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,12 +49,14 @@ function Admin() {
       <div className="mx-auto max-w-7xl px-4 py-6">
         <Tabs defaultValue="bookings">
           <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-1 rounded-2xl bg-[#ffe4f2] p-1">
-            {["bookings", "customers", "banks", "wallet", "withdrawals", "services", "sliders", "settings", "support", "telegram"].map((t) => (
-              <TabsTrigger key={t} value={t} className="capitalize">{t}</TabsTrigger>
+            {([["bookings", "Bookings"], ["customers", "Customers"], ["locations", "Locations"], ["whatsapp", "WhatsApp"], ["banks", "Banks"], ["wallet", "Wallet"], ["withdrawals", "Withdrawals"], ["services", "Services"], ["sliders", "Sliders"], ["settings", "Settings"], ["support", "Support"], ["telegram", "Telegram"]] as const).map(([t, label]) => (
+              <TabsTrigger key={t} value={t}>{label}</TabsTrigger>
             ))}
           </TabsList>
           <TabsContent value="bookings"><BookingsTab /></TabsContent>
           <TabsContent value="customers"><CustomersTab /></TabsContent>
+          <TabsContent value="locations"><LocationsTab /></TabsContent>
+          <TabsContent value="whatsapp"><WhatsappTab /></TabsContent>
           <TabsContent value="banks"><BanksTab /></TabsContent>
           <TabsContent value="wallet"><WalletTab /></TabsContent>
           <TabsContent value="withdrawals"><WithdrawalsTab /></TabsContent>
@@ -291,6 +293,7 @@ function BookingDetail({ b }: { b: Booking }) {
 
 function CustomersTab() {
   const qc = useQueryClient();
+  const [open, setOpen] = useState<Profile | null>(null);
   const { data: people = [] } = useQuery({
     queryKey: ["admin-customers"],
     queryFn: async () => {
@@ -307,6 +310,22 @@ function CustomersTab() {
       return data as BankAccount[];
     },
   });
+  const { data: locations = [] } = useQuery({
+    queryKey: ["admin-locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("salon_locations").select("*").order("city");
+      if (error) return [] as SalonLocation[];
+      return data as SalonLocation[];
+    },
+  });
+  const { data: numbers = [] } = useQuery({
+    queryKey: ["admin-whatsapp"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("whatsapp_numbers").select("*").order("label");
+      if (error) return [] as WhatsappNumber[];
+      return data as WhatsappNumber[];
+    },
+  });
   const save = async (p: Profile, patch: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => {
     const { error } = await supabase.rpc("admin_update_customer", { p_user: p.id, p_allow_bank: patch.allow_bank, p_allow_wallet: patch.allow_wallet, p_allow_card: patch.allow_card, p_bank: patch.bank_account_id });
     if (error) { toast.error(error.message); return; }
@@ -314,15 +333,36 @@ function CustomersTab() {
     qc.invalidateQueries({ queryKey: ["admin-customers"] });
   };
   return (
-    <div className="space-y-3">
-      {people.map((p) => (
-        <CustomerRow key={p.id} person={p} banks={banks} onSave={(patch) => save(p, patch)} />
-      ))}
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      <table className="w-full text-sm">
+        <thead className="bg-muted text-left text-xs text-muted-foreground">
+          <tr><th className="p-3">Customer</th><th className="p-3">Mobile</th><th className="p-3">City</th><th className="p-3">Wallet</th><th className="p-3">Location</th><th className="p-3">WhatsApp</th><th /></tr>
+        </thead>
+        <tbody>
+          {people.map((p) => (
+            <tr key={p.id} className="border-t border-border">
+              <td className="p-3"><p className="font-medium">{p.full_name || "No name"}</p><p className="font-mono text-xs text-muted-foreground">{p.user_code}</p></td>
+              <td className="p-3">{p.phone || "—"}</td>
+              <td className="p-3">{p.city || "—"}</td>
+              <td className="p-3">{sar(Number(p.wallet_balance || 0))}</td>
+              <td className="p-3">{p.assigned_address || "—"}</td>
+              <td className="p-3">{p.assigned_whatsapp || "—"}</td>
+              <td className="p-3"><Button size="icon" variant="ghost" onClick={() => setOpen(p)} aria-label="Open"><Eye className="h-4 w-4" /></Button></td>
+            </tr>
+          ))}
+          {people.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">No customers</td></tr>}
+        </tbody>
+      </table>
+      <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          {open && <CustomerRow person={people.find((x) => x.id === open.id) ?? open} banks={banks} locations={locations} numbers={numbers} onSave={(patch) => save(open, patch)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAccount[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => void }) {
+function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Profile; banks: BankAccount[]; locations: SalonLocation[]; numbers: WhatsappNumber[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => void }) {
   const [allowBank, setAllowBank] = useState(person.allow_bank);
   const [allowWallet, setAllowWallet] = useState(person.allow_wallet);
   const [allowCard, setAllowCard] = useState(person.allow_card ?? true);
@@ -358,38 +398,178 @@ function CustomerRow({ person, banks, onSave }: { person: Profile; banks: BankAc
         <Input className="w-24" placeholder="+/- SAR" value={delta} onChange={(e) => setDelta(e.target.value)} />
         <Button size="sm" variant="outline" onClick={adjust}>Adjust wallet</Button>
       </div>
-      <ContactFields person={person} />
+      <PlacePick person={person} locations={locations} numbers={numbers} />
     </div>
   );
 }
 
-function ContactFields({ person }: { person: Profile }) {
+function PlacePick({ person, locations, numbers }: { person: Profile; locations: SalonLocation[]; numbers: WhatsappNumber[] }) {
   const qc = useQueryClient();
-  const [on, setOn] = useState(!!person.contact_enabled);
-  const [wa, setWa] = useState(person.assigned_whatsapp ?? "");
-  const [addr, setAddr] = useState(person.assigned_address ?? "");
-  const [map, setMap] = useState(person.assigned_map_url ?? "");
-  const [query, setQuery] = useState(person.assigned_address ?? "");
+  const [locationId, setLocationId] = useState(person.location_id ?? "");
+  const [whatsappId, setWhatsappId] = useState(person.whatsapp_id ?? "");
   const save = async () => {
-    const { error } = await supabase.rpc("admin_set_contact", { p_user: person.id, p_enabled: on, p_whatsapp: wa, p_address: addr, p_map: map });
+    const { error } = await supabase.rpc("admin_assign_place", { p_user: person.id, p_location: locationId || null, p_whatsapp: whatsappId || null });
     if (error) { toast.error(error.message); return; }
-    toast.success(on ? "Location and WhatsApp shown to this customer" : "Location and WhatsApp hidden");
+    toast.success("Location and WhatsApp saved for this customer");
     qc.invalidateQueries({ queryKey: ["admin-customers"] });
   };
   return (
     <div className="space-y-2 md:col-span-2">
-      <label className="flex items-center gap-2 text-sm">Show location and WhatsApp <Switch checked={on} onCheckedChange={setOn} /></label>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Input placeholder="WhatsApp number" value={wa} onChange={(e) => setWa(e.target.value)} />
-        <Input placeholder="Location address" value={addr} onChange={(e) => setAddr(e.target.value)} />
-        <Input placeholder="Google Maps link" value={map} onChange={(e) => setMap(e.target.value)} />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="text-sm">Select city / location
+          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">No location</option>
+            {locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.city}{l.address ? ` — ${l.address}` : ""}</option>)}
+          </select>
+        </label>
+        <label className="text-sm">Select WhatsApp number
+          <select value={whatsappId} onChange={(e) => setWhatsappId(e.target.value)} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">No WhatsApp</option>
+            {numbers.filter((n) => n.active).map((n) => <option key={n.id} value={n.id}>{n.label ? `${n.label} — ` : ""}{n.phone}</option>)}
+          </select>
+        </label>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Input className="max-w-sm" placeholder="Search a city or salon on the map" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <Button type="button" size="sm" variant="outline" onClick={() => { setAddr(query); setMap(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`); }}>Use this location</Button>
+      <Button size="sm" onClick={save}>Save for this customer</Button>
+    </div>
+  );
+}
+
+function LocationsTab() {
+  const qc = useQueryClient();
+  const blank = { city: "", address: "", map_url: "", active: true };
+  const [edit, setEdit] = useState<(typeof blank & { id?: string }) | null>(null);
+  const [pin, setPin] = useState("");
+  const { data = [] } = useQuery({
+    queryKey: ["admin-locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("salon_locations").select("*").order("city");
+      if (error) throw error;
+      return data as SalonLocation[];
+    },
+  });
+  const save = async () => {
+    if (!edit?.city.trim()) { toast.error("Enter the city name"); return; }
+    const row = { city: edit.city.trim(), address: edit.address.trim() || null, map_url: edit.map_url.trim() || (pin.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.trim())}` : null), active: edit.active };
+    const { error } = edit.id ? await supabase.from("salon_locations").update(row).eq("id", edit.id) : await supabase.from("salon_locations").insert(row);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Location saved");
+    setEdit(null); setPin("");
+    qc.invalidateQueries({ queryKey: ["admin-locations"] });
+  };
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("salon_locations").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Location deleted");
+    qc.invalidateQueries({ queryKey: ["admin-locations"] });
+  };
+  return (
+    <div className="space-y-3">
+      <Button className="rounded-full" onClick={() => { setEdit({ ...blank }); setPin(""); }}><Plus className="mr-1 h-4 w-4" />Add location</Button>
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <table className="w-full text-sm">
+          <thead className="bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-3">City</th><th className="p-3">Address</th><th className="p-3">Status</th><th /></tr></thead>
+          <tbody>
+            {data.map((l) => (
+              <tr key={l.id} className="border-t border-border">
+                <td className="p-3 font-medium">{l.city}</td>
+                <td className="p-3">{l.address || "—"}</td>
+                <td className="p-3">{l.active ? "Active" : "Hidden"}</td>
+                <td className="p-3">
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { setEdit({ id: l.id, city: l.city, address: l.address || "", map_url: l.map_url || "", active: l.active }); setPin(l.address || l.city); }}>Edit</Button>
+                    <Button size="sm" variant="destructive" onClick={() => remove(l.id)}>Delete</Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {data.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No locations yet</td></tr>}
+          </tbody>
+        </table>
       </div>
-      {query && <iframe title="Map search" className="h-52 w-full rounded-2xl border border-pink-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`} />}
-      <Button size="sm" variant="outline" onClick={save}>Save location</Button>
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          {edit && (
+            <div className="space-y-3">
+              <DialogHeader><DialogTitle>{edit.id ? "Edit location" : "New location"}</DialogTitle></DialogHeader>
+              <div><Label>City name</Label><Input value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></div>
+              <div><Label>Address</Label><Input value={edit.address ?? ""} onChange={(e) => setEdit({ ...edit, address: e.target.value })} /></div>
+              <div><Label>Pin on the map</Label><Input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Search a place" /></div>
+              {pin && <iframe title="Location pin" className="h-52 w-full rounded-2xl border border-pink-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(pin)}&z=15&output=embed`} />}
+              <label className="flex items-center gap-2 text-sm">Active <Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} /></label>
+              <Button className="w-full" onClick={save}>Save location</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function WhatsappTab() {
+  const qc = useQueryClient();
+  const blank = { label: "", phone: "", active: true };
+  const [edit, setEdit] = useState<(typeof blank & { id?: string }) | null>(null);
+  const { data = [] } = useQuery({
+    queryKey: ["admin-whatsapp"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("whatsapp_numbers").select("*").order("label");
+      if (error) throw error;
+      return data as WhatsappNumber[];
+    },
+  });
+  const save = async () => {
+    const phone = (edit?.phone || "").replace(/[^\d+]/g, "");
+    if (phone.replace(/\D/g, "").length < 8) { toast.error("Enter a WhatsApp number"); return; }
+    const row = { label: edit?.label.trim() || null, phone, active: edit?.active ?? true };
+    const { error } = edit?.id ? await supabase.from("whatsapp_numbers").update(row).eq("id", edit.id) : await supabase.from("whatsapp_numbers").insert(row);
+    if (error) { toast.error(error.message); return; }
+    toast.success("WhatsApp number saved");
+    setEdit(null);
+    qc.invalidateQueries({ queryKey: ["admin-whatsapp"] });
+  };
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("whatsapp_numbers").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("WhatsApp number deleted");
+    qc.invalidateQueries({ queryKey: ["admin-whatsapp"] });
+  };
+  return (
+    <div className="space-y-3">
+      <Button className="rounded-full" onClick={() => setEdit({ ...blank })}><Plus className="mr-1 h-4 w-4" />Add WhatsApp number</Button>
+      <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <table className="w-full text-sm">
+          <thead className="bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-3">Label</th><th className="p-3">Number</th><th className="p-3">Status</th><th /></tr></thead>
+          <tbody>
+            {data.map((n) => (
+              <tr key={n.id} className="border-t border-border">
+                <td className="p-3 font-medium">{n.label || "—"}</td>
+                <td className="p-3">{n.phone}</td>
+                <td className="p-3">{n.active ? "Active" : "Hidden"}</td>
+                <td className="p-3">
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEdit({ id: n.id, label: n.label || "", phone: n.phone, active: n.active })}>Edit</Button>
+                    <Button size="sm" variant="destructive" onClick={() => remove(n.id)}>Delete</Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {data.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">No WhatsApp numbers yet</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent>
+          {edit && (
+            <div className="space-y-3">
+              <DialogHeader><DialogTitle>{edit.id ? "Edit WhatsApp number" : "New WhatsApp number"}</DialogTitle></DialogHeader>
+              <div><Label>Label</Label><Input value={edit.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} /></div>
+              <div><Label>WhatsApp number</Label><Input value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} placeholder="966534628789" /></div>
+              <label className="flex items-center gap-2 text-sm">Active <Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} /></label>
+              <Button className="w-full" onClick={save}>Save</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

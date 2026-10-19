@@ -39,20 +39,16 @@ function CartPage() {
   const [date, setDate] = useState<Date | undefined>(slot ? new Date(slot.date + "T00:00") : new Date());
   const [time, setTime] = useState<string | null>(slot?.time ?? null);
   const ksa = ksaNow();
+  const picked = date ? format(date, "yyyy-MM-dd") : ksa.date;
   const slots = useMemo(() => {
-    const open = String(settings.open_time || "00:00").slice(0, 5);
-    let close = String(settings.close_time || "00:00").slice(0, 5);
-    const stock = (open === "10:00" && (close === "23:00" || close === "14:00")) || close === "00:00" || close === "24:00" || close <= open;
-    const start = stock ? "00:00" : open;
-    const end = stock ? "24:00" : close;
-    const all = timeSlots(start, end, 30);
-    if (!date || format(date, "yyyy-MM-dd") !== ksa.date) return all;
+    const all = timeSlots(settings.open_time, settings.close_time);
+    if (picked !== ksa.date) return all;
     const nowMin = ksa.hour * 60 + ksa.minute;
     return all.filter((t) => {
       const [h = 0, m = 0] = t.split(":").map(Number);
       return h * 60 + m > nowMin;
     });
-  }, [date, settings.open_time, settings.close_time, ksa.date, ksa.hour, ksa.minute]);
+  }, [picked, settings.open_time, settings.close_time, ksa.date, ksa.hour, ksa.minute]);
   const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
@@ -172,7 +168,7 @@ function CartPage() {
                       {time === t && <Check className="h-4 w-4" />}{fmtTime(t)}
                     </button>
                   ))}
-                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">No times left today.</p>}
+                  {slots.length === 0 && <p className="col-span-2 text-sm text-[#9a5b78]">{picked === ksa.date ? "No times left today. Pick another date." : "No times for this day."}</p>}
                 </div>
               </div>
             </div>
