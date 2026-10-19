@@ -990,6 +990,15 @@ begin
 end $$;
 grant execute on function public.admin_assign_place(uuid, uuid, uuid) to authenticated;
 
+create or replace function public.mark_popups_read(p_ids uuid[])
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.notifications
+  set read = true
+  where user_id = auth.uid() and id = any(coalesce(p_ids, '{}'));
+end $$;
+grant execute on function public.mark_popups_read(uuid[]) to authenticated;
+
 alter table public.settings add column if not exists support_avatar_url text;
 alter table public.settings add column if not exists support_online boolean not null default true;
 alter table public.support_messages add column if not exists attachment_url text;

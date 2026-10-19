@@ -6,7 +6,19 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
+const DISMISS_KEY = "dismissed-popups";
 type Note = { id: string; title: string; body: string | null; kind?: string | null };
+
+function dismissedIds() {
+  try { return new Set<string>(JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]")); }
+  catch { return new Set<string>(); }
+}
+
+function remember(ids: string[]) {
+  const next = dismissedIds();
+  ids.forEach((id) => next.add(id));
+  localStorage.setItem(DISMISS_KEY, JSON.stringify([...next].slice(-100)));
+}
 
 export function ReasonPopup() {
   const { user } = useAuth();
@@ -21,11 +33,19 @@ export function ReasonPopup() {
     queryFn: async () => {
       const { data, error } = await supabase.from("notifications").select("id, title, body").eq("popup", true).eq("read", false).order("created_at", { ascending: false }).limit(5);
       if (error) return [];
-      return data as Note[];
+      const skip = dismissedIds();
+      return (data as Note[]).filter((n) => !skip.has(n.id));
     },
   });
 
   useEffect(() => { setReady(true); }, []);
+
+  const markRead = async (ids: string[]) => {
+    if (!user || !ids.length) return;
+    remember(ids);
+    const rpc = await supabase.rpc("mark_popups_read", { p_ids: ids });
+    if (rpc.error) await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).in("id", ids);
+  };
 
   useEffect(() => {
     if (!ready || open) return;
@@ -33,11 +53,13 @@ export function ReasonPopup() {
     if (!next) return;
     data.forEach((n) => seen.current.add(n.id));
     setOpen(next);
-    supabase.from("notifications").update({ read: true }).in("id", data.map((n) => n.id));
+    markRead(data.map((n) => n.id));
   }, [data, open, ready]);
 
   const close = async () => {
+    const ids = open ? [open.id] : [];
     setOpen(null);
+    await markRead(ids);
     qc.invalidateQueries({ queryKey: ["popups"] });
     qc.invalidateQueries({ queryKey: ["unread"] });
   };
