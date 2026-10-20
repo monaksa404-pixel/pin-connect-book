@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -75,6 +75,7 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function RequireAuth({ children, what = "continue" }: { children: ReactNode; what?: string }) {
   const { user, loading } = useAuth();
+  const path = useRouterState({ select: (s) => s.location.pathname });
   if (loading) return <div className="py-24 text-center text-muted-foreground">Loading…</div>;
   if (!user)
     return (
@@ -85,7 +86,7 @@ export function RequireAuth({ children, what = "continue" }: { children: ReactNo
         <h2 className="mt-4 text-3xl font-semibold">Sign in to {what}</h2>
         <p className="mt-2 text-sm text-muted-foreground">Create a free account in seconds to book and track your appointments.</p>
         <div className="mt-6 flex justify-center gap-2">
-          <Button asChild className="rounded-full"><Link to="/login">Sign in</Link></Button>
+          <Button asChild className="rounded-full"><Link to="/login" search={{ redirect: path }}>Sign in</Link></Button>
           <Button asChild variant="outline" className="rounded-full"><Link to="/signup">Create account</Link></Button>
         </div>
       </div>

@@ -78,9 +78,9 @@ export function SiteHeader() {
             )}
           </Link>
           {isAdmin && (
-            <Link to="/admin" className="hidden rounded-full p-2 hover:bg-secondary sm:block" aria-label="Admin">
+            <a href="/admin" className="rounded-full p-2 hover:bg-secondary" aria-label="Admin">
               <Shield className="h-5 w-5" />
-            </Link>
+            </a>
           )}
           {user ? (
             <Button
@@ -114,9 +114,9 @@ export function SiteHeader() {
               </Link>
             ))}
             {isAdmin && (
-              <Link to="/admin" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium hover:bg-secondary">
+              <a href="/admin" className="rounded-lg px-3 py-3 text-sm font-medium hover:bg-secondary">
                 Admin panel
-              </Link>
+              </a>
             )}
             {user ? (
               <button

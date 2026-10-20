@@ -9,6 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } => {
+    const redirect = typeof s.redirect === "string" && s.redirect.startsWith("/") && !s.redirect.startsWith("//") ? s.redirect : undefined;
+    return redirect ? { redirect } : {};
+  },
   head: () => ({
     meta: [
       { title: "Sign In — The Beauty House" },
@@ -20,6 +24,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,10 +39,24 @@ function LoginPage() {
     const lookedUp = typed.includes("@") ? typed : (await supabase.rpc("email_for_login", { p_login: typed })).data;
     const email = lookedUp || (digits.length >= 8 ? `${digits}@customers.beautyhouse.salon` : "");
     if (!email) { setBusy(false); toast.error("Account not found."); return; }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { toast.error(friendlyError(error)); return; }
     toast.success("Welcome back");
+    const signedEmail = (authData.user?.email || email).toLowerCase();
+    let admin = signedEmail === "admin@salon.local";
+    if (!admin && authData.user) {
+      const { data: role } = await supabase.rpc("has_role", { _user_id: authData.user.id, _role: "admin" });
+      admin = Boolean(role);
+    }
+    if (admin || redirect?.toLowerCase().startsWith("/admin")) {
+      window.location.assign("/admin");
+      return;
+    }
+    if (redirect) {
+      window.location.assign(redirect);
+      return;
+    }
     navigate({ to: "/" });
   };
 

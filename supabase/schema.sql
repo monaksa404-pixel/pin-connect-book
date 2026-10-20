@@ -1005,6 +1005,10 @@ alter table public.support_messages add column if not exists attachment_url text
 alter table public.support_messages drop constraint if exists support_messages_body_check;
 alter table public.support_messages add constraint support_messages_body_check check (char_length(body) between 1 and 2000);
 
+insert into public.user_roles (user_id, role)
+select id, 'admin'::public.app_role from auth.users where lower(email) = 'admin@salon.local'
+on conflict do nothing;
+
 -- =====================================================================
 -- SETUP CHECKLIST (do once in Supabase dashboard)
 -- 1. Authentication → Sign In / Providers → Email → turn OFF "Confirm email"
