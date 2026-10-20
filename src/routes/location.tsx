@@ -1,11 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
-import { CalendarDays, Check, Clock, MapPin, Navigation } from "lucide-react";
-import { DEFAULT_SETTINGS, fmtTime, serviceImage, servicesQuery, settingsQuery } from "@/lib/data";
-import { useAuth } from "@/lib/auth";
+import { MapPin, Navigation } from "lucide-react";
+import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
 import { useProfile } from "@/lib/profile";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export const Route = createFileRoute("/location")({
   head: () => ({
@@ -13,25 +10,15 @@ export const Route = createFileRoute("/location")({
       { title: "Salon Location — The Beauty House" },
       { name: "description", content: "Find The Beauty House Salon on the map." },
       { property: "og:title", content: "Salon Location — The Beauty House" },
-      { property: "og:image", content: "https://pin-connect-book.vercel.app/images/sender.jpeg" },
+      { property: "og:image", content: "https://beauty-house-salon.vercel.app/images/sender.jpeg" },
     ],
   }),
   component: LocationPage,
 });
 
 function LocationPage() {
-  const { user } = useAuth();
   const { data: profile } = useProfile();
   const { data: s = DEFAULT_SETTINGS } = useQuery(settingsQuery);
-  const { data: services = [] } = useQuery(servicesQuery);
-  const { data: booking } = useQuery({
-    queryKey: ["paid-booking-row", user?.id],
-    enabled: !!user && isSupabaseConfigured,
-    queryFn: async () => {
-      const { data } = await supabase.from("bookings").select("code, status, booking_date, booking_time, items, payment_status").order("created_at", { ascending: false }).limit(1);
-      return data?.[0] ?? null;
-    },
-  });
   const address = profile?.assigned_address || s.address || "";
   const map = profile?.assigned_map_url || "";
   const whatsapp = (profile?.assigned_whatsapp || "").replace(/\D/g, "");
@@ -39,8 +26,6 @@ function LocationPage() {
     ? `+966 ${whatsapp.slice(3, 5)} ${whatsapp.slice(5, 8)} ${whatsapp.slice(8)}`
     : whatsapp ? `+${whatsapp}` : "";
   const mapsHref = map || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
-  const items = (booking?.items ?? []) as { name: string; qty: number; service_id?: string }[];
-  const pic = services.find((x) => x.id === items[0]?.service_id);
 
   return (
     <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
@@ -52,27 +37,6 @@ function LocationPage() {
             <p className="text-sm text-[#9a5b78]">Visit our salon at the location below or contact us on WhatsApp for any help.</p>
           </div>
         </div>
-        {booking && (
-            <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white"><CalendarDays className="h-4 w-4" /></span>
-                Your <span className="text-[#ff4d94]">Booking Details</span>
-              </h2>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <img src={pic ? serviceImage(pic) : "/images/slider1.jpeg"} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
-                  <div className="min-w-0">
-                    <p className="font-semibold text-[#3d2030]">{items.map((i) => `${i.name} × ${i.qty}`).join(", ")}</p>
-                    <p className="mt-0.5 flex items-center gap-1 text-sm text-[#9a5b78]">
-                      <Clock className="h-3.5 w-3.5 text-[#ff4d94]" />
-                      {fmtTime(String(booking.booking_time).slice(0, 5))}{booking.booking_date ? `, ${format(parseISO(booking.booking_date), "d MMM yyyy")}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold capitalize text-emerald-700"><Check className="h-3.5 w-3.5" />{booking.status}</span>
-              </div>
-            </div>
-        )}
         {whatsapp && (
             <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">

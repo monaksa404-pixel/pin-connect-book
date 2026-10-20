@@ -23,12 +23,12 @@ function remember(ids: string[]) {
 export function ReasonPopup() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const seen = useRef(new Set<string>());
+  const seen = useRef(dismissedIds());
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState<Note | null>(null);
   const { data = [] } = useQuery({
     queryKey: ["popups", user?.id],
-    enabled: !!user && isSupabaseConfigured,
+    enabled: ready && !!user && isSupabaseConfigured,
     refetchInterval: 15000,
     queryFn: async () => {
       const { data, error } = await supabase.from("notifications").select("id, title, body").eq("popup", true).eq("read", false).order("created_at", { ascending: false }).limit(5);
@@ -38,26 +38,33 @@ export function ReasonPopup() {
     },
   });
 
-  useEffect(() => { setReady(true); }, []);
+  useEffect(() => {
+    seen.current = dismissedIds();
+    setReady(true);
+  }, []);
 
   const markRead = async (ids: string[]) => {
-    if (!user || !ids.length) return;
+    if (!ids.length) return;
+    ids.forEach((id) => seen.current.add(id));
     remember(ids);
+    if (!user) return;
     const rpc = await supabase.rpc("mark_popups_read", { p_ids: ids });
-    if (rpc.error) await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).in("id", ids);
+    if (rpc.error) await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("popup", true).in("id", ids);
   };
 
   useEffect(() => {
     if (!ready || open) return;
-    const next = data.find((n) => !seen.current.has(n.id));
+    const next = data.find((n) => !seen.current.has(n.id) && !dismissedIds().has(n.id));
     if (!next) return;
-    data.forEach((n) => seen.current.add(n.id));
+    const ids = data.map((n) => n.id).filter((id) => !dismissedIds().has(id));
+    ids.forEach((id) => seen.current.add(id));
     setOpen(next);
-    markRead(data.map((n) => n.id));
+    markRead(ids);
   }, [data, open, ready]);
 
   const close = async () => {
-    const ids = open ? [open.id] : [];
+    const ids = data.map((n) => n.id);
+    if (open) ids.push(open.id);
     setOpen(null);
     await markRead(ids);
     qc.invalidateQueries({ queryKey: ["popups"] });

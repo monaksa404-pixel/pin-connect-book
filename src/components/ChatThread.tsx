@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import ISO6391 from "iso-639-1";
-import { CalendarDays, CheckCheck, CreditCard, HelpCircle, MapPin, Paperclip, Send, Smile, Tag } from "lucide-react";
+import { CalendarDays, CheckCheck, Copy, CreditCard, HelpCircle, Languages, MapPin, Paperclip, Send, Smile, Tag } from "lucide-react";
 import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -13,24 +13,50 @@ function isImage(url: string) {
   return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
 }
 
+async function copyExact(body: string) {
+  try {
+    await navigator.clipboard.writeText(body);
+    toast.success("Copied");
+  } catch {
+    toast.error("Could not copy");
+  }
+}
+
+function pasteExact(e: React.ClipboardEvent<HTMLTextAreaElement>, text: string, setText: (v: string) => void) {
+  e.preventDefault();
+  const raw = e.clipboardData.getData("text/plain");
+  const start = e.currentTarget.selectionStart ?? text.length;
+  const end = e.currentTarget.selectionEnd ?? text.length;
+  setText((text.slice(0, start) + raw + text.slice(end)).slice(0, 2000));
+}
+
 function MessageView({ body, attachment }: { body: string; attachment?: string | null | undefined }) {
   const image = !!attachment && isImage(attachment);
-  const showText = !!body.trim() && body !== "." && !attachment;
+  const showText = body !== "." && !attachment;
   return (
     <>
-      {showText && <p dir="auto" className="select-text whitespace-pre-wrap break-words">{body}</p>}
+      {showText && body.length > 0 && (
+        <div className="flex items-start gap-2">
+          <p dir="auto" className="select-text flex-1 whitespace-pre-wrap break-words">{body}</p>
+          <button type="button" aria-label="Copy message" onClick={() => copyExact(body)} className="shrink-0 opacity-70"><Copy className="h-3.5 w-3.5" /></button>
+        </div>
+      )}
       {image && <img src={attachment!} alt="" className="max-h-48 rounded-lg" />}
       {attachment && !image && <a href={attachment} target="_blank" rel="noreferrer" className="underline">Open file</a>}
     </>
   );
 }
 
-const RTL = new Set(["ar", "ur", "fa", "he", "ps", "sd", "dv", "yi", "ku", "ug"]);
-const FIRST = ["en", "ur", "ar"];
-const LANGUAGES = [
-  ...FIRST,
-  ...ISO6391.getAllCodes().filter((code) => !FIRST.includes(code)).sort((a, b) => ISO6391.getName(a).localeCompare(ISO6391.getName(b))),
-];
+const RTL = new Set(["ar", "ur", "ps"]);
+const LANGUAGES = ["ur", "hi", "bn", "ne", "ar", "ps"];
+const PLACEHOLDER: Record<string, string> = {
+  ur: "اپنا پیغام لکھیں...",
+  hi: "अपना संदेश लिखें...",
+  bn: "আপনার বার্তা লিখুন...",
+  ne: "आफ्नो सन्देश लेख्नुहोस्...",
+  ar: "اكتب رسالتك...",
+  ps: "خپل پیغام ولیکئ...",
+};
 
 function languageLabel(code: string) {
   const native = ISO6391.getNativeName(code);
@@ -43,10 +69,11 @@ type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: str
 export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin" }) {
   const qc = useQueryClient();
   const [text, setText] = useState("");
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState("ur");
+  const [langOpen, setLangOpen] = useState(false);
   useEffect(() => {
     const saved = localStorage.getItem("chat-language");
-    if (saved && ISO6391.validate(saved)) setLang(saved);
+    if (saved && LANGUAGES.includes(saved)) setLang(saved);
   }, []);
   const choose = (code: string) => {
     setLang(code);
@@ -61,7 +88,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
       return (data?.chat_language as string | null) || "";
     },
   });
-  const activeLang = as === "admin" && customerLang && ISO6391.validate(customerLang) ? customerLang : lang;
+  const activeLang = as === "admin" && customerLang && LANGUAGES.includes(customerLang) ? customerLang : lang;
   const dir = RTL.has(activeLang) ? "rtl" : "ltr";
   const box = useRef<HTMLDivElement>(null);
   const { data } = useQuery({
@@ -117,7 +144,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
   if (as === "admin") {
     return (
       <div className="flex h-[60vh] flex-col rounded-3xl border border-border bg-card">
-        {customerLang && ISO6391.validate(customerLang) && <p className="border-b border-border px-4 py-2 text-sm text-[#9a5b78]">Customer language: {languageLabel(customerLang)}</p>}
+        {customerLang && LANGUAGES.includes(customerLang) && <p className="border-b border-border px-4 py-2 text-sm text-[#9a5b78]">Customer language: {languageLabel(customerLang)}</p>}
         <div ref={box} className="flex-1 space-y-2 overflow-y-auto p-4" dir={dir}>
           {rows.map((m) => (
             <div key={m.id} className={cn("flex", m.sender === "admin" ? "justify-end" : "justify-start")}>
@@ -130,7 +157,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         <form onSubmit={send} className="flex gap-2 border-t border-border p-3">
           <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
           <Button type="button" size="icon" variant="ghost" aria-label="Attachment" onClick={() => fileRef.current?.click()}><Paperclip className="h-4 w-4" /></Button>
-          <textarea value={text} rows={2} maxLength={2000} dir={dir} lang={activeLang} onChange={(e) => setText(e.target.value)} placeholder="Reply…" className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-input bg-background px-3 py-2 text-sm" />
+          <textarea value={text} rows={2} maxLength={2000} dir={dir} lang={activeLang} onChange={(e) => setText(e.target.value)} onPaste={(e) => pasteExact(e, text, setText)} placeholder="Reply…" className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-input bg-background px-3 py-2 text-sm" />
           <Button type="submit" size="icon" className="shrink-0 rounded-full" aria-label="Send"><Send className="h-4 w-4" /></Button>
         </form>
       </div>
@@ -149,12 +176,6 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           <p className="text-[10px] text-[#9a5b78]">Usually replies in a few minutes</p>
         </div>
       </div>
-      <label className="mb-3 block text-sm font-semibold text-[#5c2344]">
-        Chat language
-        <select value={lang} onChange={(e) => choose(e.target.value)} className="mt-1 h-11 w-full rounded-2xl border border-pink-100 bg-white px-3 text-sm font-medium text-[#3d2030]">
-          {LANGUAGES.map((code) => <option key={code} value={code}>{languageLabel(code)}</option>)}
-        </select>
-      </label>
       <div className="flex items-center gap-3 rounded-3xl bg-white p-3 shadow-sm">
         <span className="relative h-12 w-12 shrink-0">
           <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-full bg-[#ffe4f2] text-[#ff4d94]">
@@ -165,6 +186,20 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-[#3d2030]">Beauty House Support</p>
           <p className={`flex items-center gap-1 text-xs ${settings.support_online ? "text-emerald-600" : "text-[#9a5b78]"}`}><span className={`h-1.5 w-1.5 rounded-full ${settings.support_online ? "bg-emerald-500" : "bg-gray-300"}`} /> {settings.support_online ? "Online" : "Offline"}</p>
+        </div>
+        <div className="relative">
+          <button type="button" aria-label="Change language" onClick={() => setLangOpen((v) => !v)} className="grid h-10 w-10 place-items-center rounded-full bg-[#ffe4f2] text-[#ff4d94]">
+            <Languages className="h-5 w-5" />
+          </button>
+          {langOpen && (
+            <div className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-lg">
+              {LANGUAGES.map((code) => (
+                <button key={code} type="button" onClick={() => { choose(code); setLangOpen(false); }} className={`block w-full px-3 py-2 text-left text-sm ${lang === code ? "bg-[#ffe4f2] font-semibold text-[#e23b86]" : "text-[#3d2030]"}`}>
+                  {languageLabel(code)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <div ref={box} className="mt-3 flex-1 space-y-3 overflow-y-auto">
@@ -202,7 +237,7 @@ export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin
           </div>
           <form onSubmit={send} className="flex items-center gap-2 rounded-full bg-white px-3 py-1 shadow-sm">
             <button type="button" aria-label="Emoji" onClick={() => setText((t) => `${t}😊`)} className="text-[#ff4d94]"><Smile className="h-5 w-5" /></button>
-            <textarea value={text} rows={1} maxLength={2000} dir={dir} lang={lang} onChange={(e) => setText(e.target.value)} placeholder={dir === "rtl" ? "اپنا پیغام لکھیں..." : "Type a message..."} className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2 text-sm outline-none" />
+            <textarea value={text} rows={1} maxLength={2000} dir={dir} lang={lang} onChange={(e) => setText(e.target.value)} onPaste={(e) => pasteExact(e, text, setText)} placeholder={PLACEHOLDER[lang] || "Type a message..."} className="max-h-28 min-h-10 flex-1 resize-none bg-transparent py-2 text-sm outline-none" />
             <input ref={fileRef} type="file" accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) sendFile(f); e.currentTarget.value = ""; }} />
             <button type="button" aria-label="Attachment" onClick={() => fileRef.current?.click()} className="text-[#9a5b78]"><Paperclip className="h-5 w-5" /></button>
             <Button type="submit" size="icon" className="shrink-0 rounded-full bg-[#ff4d94]" aria-label="Send"><Send className="h-4 w-4" /></Button>
