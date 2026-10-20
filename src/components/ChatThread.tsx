@@ -48,8 +48,9 @@ function MessageView({ body, attachment }: { body: string; attachment?: string |
 }
 
 const RTL = new Set(["ar", "ur", "ps"]);
-const LANGUAGES = ["ur", "hi", "bn", "ne", "ar", "ps"];
+const LANGUAGES = ["en", "ur", "hi", "bn", "ne", "ar", "ps"];
 const PLACEHOLDER: Record<string, string> = {
+  en: "Write your message...",
   ur: "اپنا پیغام لکھیں...",
   hi: "अपना संदेश लिखें...",
   bn: "আপনার বার্তা লিখুন...",
@@ -69,7 +70,7 @@ type Msg = { id: string; sender: "user" | "admin"; body: string; created_at: str
 export function ChatThread({ userId, as }: { userId: string; as: "user" | "admin" }) {
   const qc = useQueryClient();
   const [text, setText] = useState("");
-  const [lang, setLang] = useState("ur");
+  const [lang, setLang] = useState("en");
   const [langOpen, setLangOpen] = useState(false);
   useEffect(() => {
     const saved = localStorage.getItem("chat-language");

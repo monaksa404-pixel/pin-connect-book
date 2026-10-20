@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Navigation } from "lucide-react";
+import { RequireAuth } from "@/components/shared";
 import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
 import { useProfile } from "@/lib/profile";
 
@@ -17,6 +18,14 @@ export const Route = createFileRoute("/location")({
 });
 
 function LocationPage() {
+  return (
+    <div className="min-h-screen bg-[#fff0f6]">
+      <RequireAuth what="see the salon location"><LocationBody /></RequireAuth>
+    </div>
+  );
+}
+
+function LocationBody() {
   const { data: profile } = useProfile();
   const { data: s = DEFAULT_SETTINGS } = useQuery(settingsQuery);
   const address = profile?.assigned_address || s.address || "";
