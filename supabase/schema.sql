@@ -1018,12 +1018,11 @@ language sql stable security definer set search_path = public as $$
   select
     case when loc.city is null then null else concat_ws(', ', loc.city, nullif(loc.address, '')) end,
     case when loc.city is null then null else loc.map_url end,
-    case when loc.city is null then null else coalesce(nullif(loc.phone, ''), case when p.location_id = loc.id then nullif(p.assigned_whatsapp, '') else null end) end
+    (select w.phone from public.whatsapp_numbers w where w.active order by w.created_at limit 1)
   from public.profiles p
   left join lateral (
-    select l.id, l.city, l.address, l.map_url, w.phone
+    select l.city, l.address, l.map_url
     from public.salon_locations l
-    left join public.whatsapp_numbers w on w.id = l.whatsapp_id and w.active
     where l.active
       and trim(coalesce(p.city, '')) <> ''
       and lower(trim(l.city)) = lower(trim(p.city))

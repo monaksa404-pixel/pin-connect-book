@@ -23,13 +23,20 @@ export function useMyPlace() {
       ]);
       const locations = (locs.data ?? []) as SalonLocation[];
       const numbers = (nums.data ?? []) as WhatsappNumber[];
-      const loc = locations.find((l) => sameCity(l.city, p?.city));
-      if (!loc) return { address: "", map_url: "", whatsapp: "" };
-      const linked = numbers.find((n) => n.id === loc.whatsapp_id);
+      const whatsapp = numbers.find((n) => n.active)?.phone || "";
+      const loc = locations.find((l) => l.active !== false && sameCity(l.city, p?.city));
+      const fromTables = {
+        address: loc ? [loc.city, loc.address].filter(Boolean).join(", ") : "",
+        map_url: loc?.map_url || "",
+        whatsapp,
+      };
+      const rpc = await supabase.rpc("my_place");
+      const row = (Array.isArray(rpc.data) ? rpc.data[0] : rpc.data) as { address?: string | null; map_url?: string | null; whatsapp?: string | null } | null;
+      if (rpc.error || !row) return fromTables;
       return {
-        address: [loc.city, loc.address].filter(Boolean).join(", "),
-        map_url: loc.map_url || "",
-        whatsapp: linked?.phone || (p?.location_id === loc.id ? p.assigned_whatsapp || "" : ""),
+        address: row.address || fromTables.address,
+        map_url: row.map_url || fromTables.map_url,
+        whatsapp: row.whatsapp || fromTables.whatsapp,
       };
     },
   });

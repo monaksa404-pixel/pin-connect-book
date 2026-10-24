@@ -34,7 +34,17 @@ function LocationBody() {
   const shown = whatsapp.startsWith("966") && whatsapp.length > 5
     ? `+966 ${whatsapp.slice(3, 5)} ${whatsapp.slice(5, 8)} ${whatsapp.slice(8)}`
     : whatsapp ? `+${whatsapp}` : "";
-  const mapsHref = map || (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "");
+  const pinQuery = (() => {
+    if (!map) return address;
+    try {
+      const u = new URL(map);
+      return u.searchParams.get("query") || u.searchParams.get("q") || address;
+    } catch {
+      return map;
+    }
+  })();
+  const embed = pinQuery ? `https://maps.google.com/maps?q=${encodeURIComponent(pinQuery)}&z=15&output=embed` : "";
+  const mapsHref = map.startsWith("http") ? map : pinQuery ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pinQuery)}` : "";
 
   return (
     <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">
@@ -78,7 +88,7 @@ function LocationBody() {
               </h2>
               <p className="mt-2 text-sm text-[#9a5b78]">Here is our exact location. You can open it in Google Maps for easy directions.</p>
               <div className="relative mt-3">
-                <iframe title="Map" className="h-64 w-full rounded-2xl border border-pink-100" loading="lazy" src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=15&output=embed`} />
+                <iframe title="Map" className="h-64 w-full rounded-2xl border border-pink-100" loading="lazy" src={embed} />
                 <div className="pointer-events-none absolute left-1/2 top-4 w-[78%] -translate-x-1/2 rounded-2xl bg-white p-3 text-center shadow-md">
                   <p className="font-semibold text-[#3d2030]">{s.salon_name}</p>
                   <p className="text-xs text-[#9a5b78]">{address}</p>

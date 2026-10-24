@@ -441,9 +441,19 @@ function PlacePick({ person, locations, numbers }: { person: Profile; locations:
   );
 }
 
+function pinText(url: string | null, address: string | null, city: string) {
+  if (url) {
+    try {
+      const q = new URL(url).searchParams.get("query") || new URL(url).searchParams.get("q");
+      if (q) return q;
+    } catch { /* keep the written address */ }
+  }
+  return address || city;
+}
+
 function LocationsTab() {
   const qc = useQueryClient();
-  const blank = { city: "", address: "", map_url: "", active: true, whatsapp_id: "" };
+  const blank = { city: "", address: "", map_url: "", active: true };
   const [edit, setEdit] = useState<(typeof blank & { id?: string }) | null>(null);
   const [pin, setPin] = useState("");
   const { data = [], isError, error } = useQuery({
@@ -454,22 +464,13 @@ function LocationsTab() {
       return data as SalonLocation[];
     },
   });
-  const { data: numbers = [] } = useQuery({
-    queryKey: ["admin-whatsapp"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("whatsapp_numbers").select("*").order("label");
-      if (error) return [] as WhatsappNumber[];
-      return data as WhatsappNumber[];
-    },
-  });
   const save = async () => {
     if (!edit?.city.trim()) { toast.error("Enter the city name"); return; }
-    const row = { city: edit.city.trim(), address: edit.address.trim() || null, map_url: edit.map_url.trim() || (pin.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.trim())}` : null), active: edit.active, whatsapp_id: edit.whatsapp_id || null };
-    const write = edit.id
-      ? (body: Record<string, unknown>) => supabase.from("salon_locations").update(body).eq("id", edit.id!)
-      : (body: Record<string, unknown>) => supabase.from("salon_locations").insert(body);
-    let { error } = await write(row);
-    if (error && /whatsapp_id/i.test(error.message)) ({ error } = await write({ city: row.city, address: row.address, map_url: row.map_url, active: row.active }));
+    if (!pin.trim()) { toast.error("Place a pin on the map"); return; }
+    const row = { city: edit.city.trim(), address: edit.address.trim() || pin.trim(), map_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pin.trim())}`, active: edit.active };
+    const { error } = edit.id
+      ? await supabase.from("salon_locations").update(row).eq("id", edit.id)
+      : await supabase.from("salon_locations").insert(row);
     if (error) { toast.error(error.message); return; }
     toast.success("Location saved");
     setEdit(null); setPin("");
@@ -486,23 +487,23 @@ function LocationsTab() {
       <Button className="rounded-full" onClick={() => { setEdit({ ...blank }); setPin(""); }}><Plus className="mr-1 h-4 w-4" />Add location</Button>
       <div className="overflow-x-auto rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
-          <thead className="bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-3">City</th><th className="p-3">Address</th><th className="p-3">WhatsApp</th><th className="p-3">Status</th><th /></tr></thead>
+          <thead className="bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-3">City</th><th className="p-3">Address</th><th className="p-3">Pin</th><th className="p-3">Status</th><th /></tr></thead>
           <tbody>
             {data.map((l) => (
               <tr key={l.id} className="border-t border-border">
                 <td className="p-3 font-medium">{l.city}</td>
                 <td className="p-3">{l.address || "—"}</td>
-                <td className="p-3">{numbers.find((n) => n.id === l.whatsapp_id)?.phone || "—"}</td>
+                <td className="p-3">{l.map_url ? "Saved" : "—"}</td>
                 <td className="p-3">{l.active ? "Active" : "Hidden"}</td>
                 <td className="p-3">
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => { setEdit({ id: l.id, city: l.city, address: l.address || "", map_url: l.map_url || "", active: l.active, whatsapp_id: l.whatsapp_id || "" }); setPin(l.address || l.city); }}>Edit</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setEdit({ id: l.id, city: l.city, address: l.address || "", map_url: l.map_url || "", active: l.active }); setPin(pinText(l.map_url, l.address, l.city)); }}>Edit</Button>
                     <Button size="sm" variant="destructive" onClick={() => remove(l.id)}>Delete</Button>
                   </div>
                 </td>
               </tr>
             ))}
-            {isError && <tr><td colSpan={5} className="p-8 text-center text-destructive">{error.message}</td></tr>}
+            {isError && <tr><td colSpan={5} className="p-8 text-center text-destructive">{error instanceof Error ? error.message : "Could not load locations"}</td></tr>}
             {!isError && data.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">No locations yet</td></tr>}
           </tbody>
         </table>
@@ -514,13 +515,7 @@ function LocationsTab() {
               <DialogHeader><DialogTitle>{edit.id ? "Edit location" : "New location"}</DialogTitle></DialogHeader>
               <div><Label>City name</Label><CitySelect value={edit.city} onChange={(city) => setEdit({ ...edit, city })} /></div>
               <div><Label>Address</Label><Input value={edit.address ?? ""} onChange={(e) => setEdit({ ...edit, address: e.target.value })} /></div>
-              <label className="text-sm">WhatsApp number
-                <select value={edit.whatsapp_id} onChange={(e) => setEdit({ ...edit, whatsapp_id: e.target.value })} className="mt-1 h-11 w-full rounded-2xl border border-input bg-background px-3 text-sm">
-                  <option value="">No WhatsApp</option>
-                  {numbers.filter((n) => n.active).map((n) => <option key={n.id} value={n.id}>{n.label ? `${n.label} — ` : ""}{n.phone}</option>)}
-                </select>
-              </label>
-              <div><Label>Pin on the map</Label><Input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Search a place" /></div>
+              <div><Label>Pin on the map</Label><Input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Type the exact place, then check the pin" /></div>
               {pin && <iframe title="Location pin" className="h-52 w-full rounded-2xl border border-pink-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(pin)}&z=15&output=embed`} />}
               <label className="flex items-center gap-2 text-sm">Active <Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} /></label>
               <Button className="w-full" onClick={save}>Save location</Button>
@@ -571,7 +566,7 @@ function WhatsappTab() {
               <tr key={n.id} className="border-t border-border">
                 <td className="p-3 font-medium">{n.label || "—"}</td>
                 <td className="p-3">{n.phone}</td>
-                <td className="p-3">{n.active ? "Active" : "Hidden"}</td>
+                <td className="p-3">{n.active ? "Active" : "Inactive"}</td>
                 <td className="p-3">
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => setEdit({ id: n.id, label: n.label || "", phone: n.phone, active: n.active })}>Edit</Button>
