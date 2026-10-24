@@ -97,7 +97,7 @@ export type Profile = {
   created_at: string;
 };
 
-export type SalonLocation = { id: string; city: string; address: string | null; map_url: string | null; active: boolean };
+export type SalonLocation = { id: string; city: string; address: string | null; map_url: string | null; active: boolean; whatsapp_id?: string | null };
 export type WhatsappNumber = { id: string; label: string | null; phone: string; active: boolean };
 
 export type BankAccount = {

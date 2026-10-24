@@ -1,28 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { useAuth } from "./auth";
-import type { BankAccount, Profile } from "./types";
+import type { BankAccount, Profile, SalonLocation, WhatsappNumber } from "./types";
+
+function sameCity(a: string | null | undefined, b: string | null | undefined) {
+  const x = (a || "").trim().toLowerCase();
+  const y = (b || "").trim().toLowerCase();
+  return !!x && x === y;
+}
 
 export function useMyPlace() {
   const { user } = useAuth();
   const profile = useProfile();
   return useQuery({
-    queryKey: ["my-place", user?.id, profile.data?.city, profile.data?.assigned_address, profile.data?.assigned_map_url, profile.data?.assigned_whatsapp],
-    enabled: !!user,
+    queryKey: ["my-place", user?.id, profile.data?.city, profile.data?.location_id, profile.data?.whatsapp_id, profile.data?.assigned_address, profile.data?.assigned_map_url, profile.data?.assigned_whatsapp],
+    enabled: !!user && profile.isFetched,
     queryFn: async () => {
-      const fallback = {
-        address: profile.data?.assigned_address || "",
-        map_url: profile.data?.assigned_map_url || "",
-        whatsapp: profile.data?.assigned_whatsapp || "",
-      };
-      const { data, error } = await supabase.rpc("my_place");
-      if (error || !data) return fallback;
-      const row = (Array.isArray(data) ? data[0] : data) as { address?: string | null; map_url?: string | null; whatsapp?: string | null } | null;
-      if (!row) return fallback;
+      const p = profile.data;
+      const [locs, nums] = await Promise.all([
+        supabase.from("salon_locations").select("*").eq("active", true),
+        supabase.from("whatsapp_numbers").select("*").eq("active", true),
+      ]);
+      const locations = (locs.data ?? []) as SalonLocation[];
+      const numbers = (nums.data ?? []) as WhatsappNumber[];
+      const loc = locations.find((l) => sameCity(l.city, p?.city));
+      if (!loc) return { address: "", map_url: "", whatsapp: "" };
+      const linked = numbers.find((n) => n.id === loc.whatsapp_id);
       return {
-        address: row.address || fallback.address,
-        map_url: row.map_url || fallback.map_url,
-        whatsapp: row.whatsapp || fallback.whatsapp,
+        address: [loc.city, loc.address].filter(Boolean).join(", "),
+        map_url: loc.map_url || "",
+        whatsapp: linked?.phone || (p?.location_id === loc.id ? p.assigned_whatsapp || "" : ""),
       };
     },
   });

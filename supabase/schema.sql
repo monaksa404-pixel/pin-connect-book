@@ -952,14 +952,21 @@ create table if not exists public.whatsapp_numbers (
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
+alter table public.salon_locations add column if not exists whatsapp_id uuid references public.whatsapp_numbers(id) on delete set null;
 alter table public.salon_locations enable row level security;
 alter table public.whatsapp_numbers enable row level security;
 drop policy if exists "locations admin" on public.salon_locations;
 create policy "locations admin" on public.salon_locations for all to authenticated
   using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "locations read active" on public.salon_locations;
+create policy "locations read active" on public.salon_locations for select to authenticated
+  using (active or public.has_role(auth.uid(), 'admin'));
 drop policy if exists "whatsapp admin" on public.whatsapp_numbers;
 create policy "whatsapp admin" on public.whatsapp_numbers for all to authenticated
   using (public.has_role(auth.uid(), 'admin')) with check (public.has_role(auth.uid(), 'admin'));
+drop policy if exists "whatsapp read active" on public.whatsapp_numbers;
+create policy "whatsapp read active" on public.whatsapp_numbers for select to authenticated
+  using (active or public.has_role(auth.uid(), 'admin'));
 grant select, insert, update, delete on public.salon_locations, public.whatsapp_numbers to authenticated;
 
 alter table public.profiles add column if not exists chat_language text;
@@ -1009,14 +1016,17 @@ create or replace function public.my_place()
 returns table (address text, map_url text, whatsapp text)
 language sql stable security definer set search_path = public as $$
   select
-    coalesce(nullif(p.assigned_address, ''), nullif(concat_ws(', ', loc.city, nullif(loc.address, '')), '')),
-    coalesce(nullif(p.assigned_map_url, ''), loc.map_url),
-    nullif(p.assigned_whatsapp, '')
+    case when loc.city is null then null else concat_ws(', ', loc.city, nullif(loc.address, '')) end,
+    case when loc.city is null then null else loc.map_url end,
+    case when loc.city is null then null else coalesce(nullif(loc.phone, ''), case when p.location_id = loc.id then nullif(p.assigned_whatsapp, '') else null end) end
   from public.profiles p
   left join lateral (
-    select l.city, l.address, l.map_url
+    select l.id, l.city, l.address, l.map_url, w.phone
     from public.salon_locations l
-    where l.active and lower(trim(l.city)) = lower(trim(coalesce(p.city, '')))
+    left join public.whatsapp_numbers w on w.id = l.whatsapp_id and w.active
+    where l.active
+      and trim(coalesce(p.city, '')) <> ''
+      and lower(trim(l.city)) = lower(trim(p.city))
     order by l.created_at
     limit 1
   ) loc on true

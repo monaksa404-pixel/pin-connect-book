@@ -26,9 +26,9 @@ function LocationPage() {
 }
 
 function LocationBody() {
-  const { data: place } = useMyPlace();
+  const { data: place, isLoading } = useMyPlace();
   const { data: s = DEFAULT_SETTINGS } = useQuery(settingsQuery);
-  const address = place?.address || s.address || "";
+  const address = place?.address || "";
   const map = place?.map_url || "";
   const whatsapp = (place?.whatsapp || "").replace(/\D/g, "");
   const shown = whatsapp.startsWith("966") && whatsapp.length > 5
@@ -71,24 +71,24 @@ function LocationBody() {
               )}
             </div>
         )}
-            <div className="rounded-3xl bg-white p-4 shadow-sm">
+            {address ? <div className="rounded-3xl bg-white p-4 shadow-sm">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-[#3d2030]">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#ff4d94] text-white"><MapPin className="h-4 w-4" /></span>
                 Salon <span className="text-[#ff4d94]">Location</span>
               </h2>
               <p className="mt-2 text-sm text-[#9a5b78]">Here is our exact location. You can open it in Google Maps for easy directions.</p>
               <div className="relative mt-3">
-                <iframe title="Map" className="h-64 w-full rounded-2xl border border-pink-100" loading="lazy" src={`https://maps.google.com/maps?q=${encodeURIComponent(address || s.address || s.salon_name)}&z=15&output=embed`} />
+                <iframe title="Map" className="h-64 w-full rounded-2xl border border-pink-100" loading="lazy" src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=15&output=embed`} />
                 <div className="pointer-events-none absolute left-1/2 top-4 w-[78%] -translate-x-1/2 rounded-2xl bg-white p-3 text-center shadow-md">
                   <p className="font-semibold text-[#3d2030]">{s.salon_name}</p>
-                  <p className="text-xs text-[#9a5b78]">{address || s.address}</p>
+                  <p className="text-xs text-[#9a5b78]">{address}</p>
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-[#fff0f6] p-3 text-sm">
-                <p className="flex items-center gap-2 text-[#5c2344]"><MapPin className="h-4 w-4 shrink-0 text-[#ff4d94]" />{address || s.address}</p>
+                <p className="flex items-center gap-2 text-[#5c2344]"><MapPin className="h-4 w-4 shrink-0 text-[#ff4d94]" />{address}</p>
                 {mapsHref && <a href={mapsHref} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 font-semibold text-[#ff4d94]"><Navigation className="h-4 w-4" />Open in Maps</a>}
               </div>
-            </div>
+            </div> : !isLoading && <p className="rounded-3xl bg-white p-6 text-center text-sm text-[#9a5b78]">No location is set for your city yet.</p>}
         <Link to="/my-bookings" className="flex h-12 items-center justify-center gap-2 rounded-full border border-pink-200 bg-white font-semibold text-[#ff4d94]">← Back to My Bookings</Link>
       </div>
     </div>
