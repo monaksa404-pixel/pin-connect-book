@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { CalendarDays, Check, Clock, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/lib/auth";
-import { useProfile } from "@/lib/profile";
+import { useMyPlace } from "@/lib/profile";
 import { supabase, friendlyError, isSupabaseConfigured } from "@/lib/supabase";
 import { DEFAULT_SETTINGS, fmtTime, sar, serviceImage, servicesQuery, settingsQuery } from "@/lib/data";
 import { sendAlert } from "@/lib/alerts";
@@ -33,7 +33,7 @@ function MyBookings() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: settings = DEFAULT_SETTINGS } = useQuery(settingsQuery);
-  const { data: profile } = useProfile();
+  const { data: place } = useMyPlace();
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ["my-bookings", user?.id],
     enabled: !!user && isSupabaseConfigured,
@@ -105,8 +105,10 @@ function MyBookings() {
               const payLabel = b.status === "completed" && b.payment_status === "verified" ? "Paid" : b.status === "cancelled" && b.payment_status === "verified" ? "Refunded" : b.payment_status === "verified" ? "Verified" : b.payment_status === "rejected" ? "Rejected" : "Pending";
               const apptTone = b.status === "confirmed" ? "bg-emerald-100 text-emerald-700" : b.status === "completed" ? "bg-sky-100 text-sky-700" : b.status === "cancelled" ? "bg-pink-100 text-[#e23b86]" : "bg-amber-100 text-amber-700";
               const payTone = b.payment_status === "verified" && b.status === "completed" ? "bg-sky-100 text-sky-700" : b.payment_status === "verified" && b.status === "cancelled" ? "bg-pink-100 text-[#e23b86]" : b.payment_status === "verified" ? "bg-emerald-100 text-emerald-700" : b.payment_status === "rejected" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700";
-              const atSalon = Math.max(0, Number(b.total) - Number(b.advance_amount) - (b.extra_payment_status === "verified" ? Number(b.extra_amount) : 0));
-              const wa = (profile?.assigned_whatsapp || (profile?.contact_enabled ? settings.whatsapp : "") || "").replace(/\D/g, "");
+              const extraPaid = b.extra_payment_status === "verified" ? Number(b.extra_amount) : 0;
+              const advanceShown = Number(b.advance_amount) + extraPaid;
+              const atSalon = Math.max(0, Number(b.total) - advanceShown);
+              const wa = (place?.whatsapp || "").replace(/\D/g, "");
               return (
                 <article key={b.id} className="rounded-3xl bg-white p-3 shadow-sm">
                   <div className="flex gap-3">
@@ -128,7 +130,7 @@ function MyBookings() {
                   </div>
                   <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-2xl bg-[#fff5f9] text-center">
                     <div className="px-1 py-2"><p className="text-[11px] text-[#9a5b78]">Total</p><p className="text-sm font-semibold text-[#3d2030]">{sar(b.total)}</p></div>
-                    <div className="border-x border-pink-100 px-1 py-2"><p className="text-[11px] text-[#9a5b78]">Advance</p><p className="text-sm font-semibold text-[#3d2030]">{sar(b.advance_amount)}</p></div>
+                    <div className="border-x border-pink-100 px-1 py-2"><p className="text-[11px] text-[#9a5b78]">Advance</p><p className="text-sm font-semibold text-[#3d2030]">{sar(advanceShown)}</p>{extraPaid > 0 && <p className="text-[10px] font-semibold text-emerald-700">Verified</p>}</div>
                     <div className="px-1 py-2"><p className="text-[11px] text-[#9a5b78]">At salon</p><p className="text-sm font-semibold text-[#3d2030]">{sar(atSalon)}</p></div>
                   </div>
                   {b.payment_status === "pending" && (

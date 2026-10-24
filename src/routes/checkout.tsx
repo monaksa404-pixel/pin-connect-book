@@ -8,7 +8,7 @@ import { useProfile } from "@/lib/profile";
 import { advanceFor, DEFAULT_SETTINGS, fmtTime, sar, serviceImage, settingsQuery } from "@/lib/data";
 import { supabase, friendlyError } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
-import { EmptyState, RequireAuth } from "@/components/shared";
+import { CitySelect, EmptyState, RequireAuth } from "@/components/shared";
 import { PaymentForm, type PaymentResult } from "@/components/PaymentForm";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -96,6 +96,7 @@ function Checkout() {
   const validateDetails = () => {
     if (name.trim().length < 2) throw new Error("Please enter your name.");
     if (!/^[+0-9 ]{8,16}$/.test(phone.trim())) throw new Error("Please enter a valid phone number.");
+    if (!city.trim()) throw new Error("Select your city.");
   };
 
   const saveProfile = async () => {
@@ -371,7 +372,7 @@ function Checkout() {
       <div className="grid grid-cols-2 gap-3 rounded-3xl bg-white p-4 shadow-sm">
         <div><Label htmlFor="n">Full name</Label><Input id="n" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} className="mt-1 rounded-2xl" /></div>
         <div><Label htmlFor="p">Phone</Label><Input id="p" value={phone} maxLength={16} inputMode="tel" placeholder="05xxxxxxxx" onChange={(e) => setPhone(e.target.value)} className="mt-1 rounded-2xl" /></div>
-        <div><Label htmlFor="c">City</Label><Input id="c" value={city} maxLength={60} onChange={(e) => setCity(e.target.value)} className="mt-1 rounded-2xl" /></div>
+        <div><Label htmlFor="c">City</Label><CitySelect id="c" value={city} onChange={setCity} className="mt-1" /></div>
         <div><Label htmlFor="no">Description</Label><Textarea id="no" value={notes} maxLength={500} placeholder="Any special request..." onChange={(e) => setNotes(e.target.value)} className="mt-1 rounded-2xl" /></div>
       </div>
       <button

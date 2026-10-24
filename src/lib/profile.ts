@@ -3,6 +3,31 @@ import { supabase, isSupabaseConfigured } from "./supabase";
 import { useAuth } from "./auth";
 import type { BankAccount, Profile } from "./types";
 
+export function useMyPlace() {
+  const { user } = useAuth();
+  const profile = useProfile();
+  return useQuery({
+    queryKey: ["my-place", user?.id, profile.data?.city, profile.data?.assigned_address, profile.data?.assigned_map_url, profile.data?.assigned_whatsapp],
+    enabled: !!user,
+    queryFn: async () => {
+      const fallback = {
+        address: profile.data?.assigned_address || "",
+        map_url: profile.data?.assigned_map_url || "",
+        whatsapp: profile.data?.assigned_whatsapp || "",
+      };
+      const { data, error } = await supabase.rpc("my_place");
+      if (error || !data) return fallback;
+      const row = (Array.isArray(data) ? data[0] : data) as { address?: string | null; map_url?: string | null; whatsapp?: string | null } | null;
+      if (!row) return fallback;
+      return {
+        address: row.address || fallback.address,
+        map_url: row.map_url || fallback.map_url,
+        whatsapp: row.whatsapp || fallback.whatsapp,
+      };
+    },
+  });
+}
+
 export function useProfile() {
   const { user } = useAuth();
   return useQuery({

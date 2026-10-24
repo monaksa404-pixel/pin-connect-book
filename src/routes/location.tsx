@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MapPin, Navigation } from "lucide-react";
 import { RequireAuth } from "@/components/shared";
 import { DEFAULT_SETTINGS, settingsQuery } from "@/lib/data";
-import { useProfile } from "@/lib/profile";
+import { useMyPlace } from "@/lib/profile";
 
 export const Route = createFileRoute("/location")({
   head: () => ({
@@ -26,11 +26,11 @@ function LocationPage() {
 }
 
 function LocationBody() {
-  const { data: profile } = useProfile();
+  const { data: place } = useMyPlace();
   const { data: s = DEFAULT_SETTINGS } = useQuery(settingsQuery);
-  const address = profile?.assigned_address || s.address || "";
-  const map = profile?.assigned_map_url || "";
-  const whatsapp = (profile?.assigned_whatsapp || "").replace(/\D/g, "");
+  const address = place?.address || s.address || "";
+  const map = place?.map_url || "";
+  const whatsapp = (place?.whatsapp || "").replace(/\D/g, "");
   const shown = whatsapp.startsWith("966") && whatsapp.length > 5
     ? `+966 ${whatsapp.slice(3, 5)} ${whatsapp.slice(5, 8)} ${whatsapp.slice(8)}`
     : whatsapp ? `+${whatsapp}` : "";

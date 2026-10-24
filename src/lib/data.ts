@@ -152,6 +152,20 @@ export function timeSlots(open: string, close: string): string[] {
   return out;
 }
 
+export const KSA_CITIES = [
+  "Abha", "Abu Arish", "Ad Darb", "Ad Dilam", "Ad Diriyah", "Afif", "Ahad Al Masarihah", "Ahad Rafidah",
+  "Al Ahsa", "Al Ais", "Al Aridah", "Al Artawiyah", "Al Bad", "Al Bahah", "Al Birk", "Al Bukayriyah",
+  "Al Duwadimi", "Al Ghat", "Al Hair", "Al Hariq", "Al Henakiyah", "Al Jumum", "Al Kamil", "Al Kharj",
+  "Al Khobar", "Al Lith", "Al Majmaah", "Al Makhwah", "Al Mithnab", "Al Mubarraz", "Al Muwayh", "Al Namas",
+  "Al Qatif", "Al Qurayyat", "Al Quwayiyah", "Al Ula", "Al Wajh", "Ar Rass", "Arar", "As Sulayyil",
+  "Badr", "Baish", "Baljurashi", "Bariq", "Bisha", "Buraydah", "Dammam", "Dhahran", "Duba", "Dumat Al Jandal",
+  "Farasan", "Hafr Al Batin", "Hail", "Hotat Bani Tamim", "Jeddah", "Jizan", "Khafji", "Khamis Mushait",
+  "Khaybar", "Khulais", "Mecca", "Medina", "Muhayil", "Najran", "Qilwah", "Rabigh", "Rafha", "Ranyah",
+  "Ras Tanura", "Riyadh", "Sabya", "Safwa", "Saihat", "Sakaka", "Samtah", "Sarat Abidah", "Sharurah",
+  "Shaqra", "Tabuk", "Taif", "Tanomah", "Tarut", "Tayma", "Thadiq", "Tubarjal", "Turaif", "Turubah",
+  "Umluj", "Unaizah", "Wadi Al Dawasir", "Yanbu", "Zulfi",
+];
+
 export const fmtTime = (t: string) => {
   const raw = String(t).slice(0, 5);
   const [h = 0, m = 0] = raw.split(":").map(Number);
@@ -159,6 +173,21 @@ export const fmtTime = (t: string) => {
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${String(hour12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ap}`;
 };
+
+export function fmtWhen(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Riyadh",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(d);
+}
 
 export function advanceFor(total: number, pct: number) {
   const advance = Math.round(total * pct) / 100;

@@ -1005,6 +1005,25 @@ alter table public.support_messages add column if not exists attachment_url text
 alter table public.support_messages drop constraint if exists support_messages_body_check;
 alter table public.support_messages add constraint support_messages_body_check check (char_length(body) between 1 and 2000);
 
+create or replace function public.my_place()
+returns table (address text, map_url text, whatsapp text)
+language sql stable security definer set search_path = public as $$
+  select
+    coalesce(nullif(p.assigned_address, ''), nullif(concat_ws(', ', loc.city, nullif(loc.address, '')), '')),
+    coalesce(nullif(p.assigned_map_url, ''), loc.map_url),
+    nullif(p.assigned_whatsapp, '')
+  from public.profiles p
+  left join lateral (
+    select l.city, l.address, l.map_url
+    from public.salon_locations l
+    where l.active and lower(trim(l.city)) = lower(trim(coalesce(p.city, '')))
+    order by l.created_at
+    limit 1
+  ) loc on true
+  where p.id = auth.uid();
+$$;
+grant execute on function public.my_place() to authenticated;
+
 insert into public.user_roles (user_id, role)
 select id, 'admin'::public.app_role from auth.users where lower(email) = 'admin@salon.local'
 on conflict do nothing;

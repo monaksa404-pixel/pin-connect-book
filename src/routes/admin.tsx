@@ -5,9 +5,9 @@ import { toast } from "sonner";
 import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
+import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, fmtWhen, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
 import type { BankAccount, Booking, Profile, SalonLocation, Service, Settings, Topup, WhatsappNumber } from "@/lib/types";
-import { RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
+import { CitySelect, RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -121,7 +121,7 @@ function BookingsTab() {
       <div className="overflow-x-auto rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted text-left text-xs text-muted-foreground">
-            <tr><th className="p-3">Code</th><th className="p-3">Customer</th><th className="p-3">When</th><th className="p-3">Total</th><th className="p-3">Payment</th><th className="p-3">Status</th><th className="p-3">Balance</th><th /></tr>
+            <tr><th className="p-3">Code</th><th className="p-3">Customer</th><th className="p-3">When</th><th className="p-3">Booked</th><th className="p-3">Total</th><th className="p-3">Payment</th><th className="p-3">Status</th><th className="p-3">Balance</th><th /></tr>
           </thead>
           <tbody>
             {list.map((b) => (
@@ -129,14 +129,15 @@ function BookingsTab() {
                 <td className="p-3 font-mono text-xs">{b.code}</td>
                 <td className="p-3"><p className="font-medium">{b.customer_name}</p><p className="text-xs text-muted-foreground">{b.phone}</p></td>
                 <td className="p-3">{b.booking_date}<br /><span className="text-xs text-muted-foreground">{fmtTime(b.booking_time)}</span></td>
+                <td className="p-3 text-xs">{fmtWhen(b.created_at)}</td>
                 <td className="p-3">{sar(b.total)}</td>
-                <td className="p-3"><StatusBadge status={b.payment_status} /><p className="mt-1 text-xs uppercase text-muted-foreground">{b.payment_method}</p></td>
+                <td className="p-3"><StatusBadge status={b.payment_status} /><p className="mt-1 text-xs uppercase text-muted-foreground">{b.payment_method}</p>{b.extra_payment_status === "verified" && <p className="mt-1 text-xs font-semibold text-emerald-700">Extra {sar(b.extra_amount)} verified in advance</p>}</td>
                 <td className="p-3"><StatusBadge status={b.status} /></td>
                 <td className="p-3"><StatusBadge status={b.extra_payment_status} /></td>
                 <td className="p-3"><Button size="icon" variant="ghost" onClick={() => setOpen(b)} aria-label="Open"><Eye className="h-4 w-4" /></Button></td>
               </tr>
             ))}
-            {list.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">No bookings</td></tr>}
+            {list.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">No bookings</td></tr>}
           </tbody>
         </table>
       </div>
@@ -197,7 +198,7 @@ function BookingDetail({ b }: { b: Booking }) {
       <div className="grid gap-2 sm:grid-cols-2">
         <div><Label>Name</Label><Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
         <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-        <div><Label>City</Label><Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+        <div><Label>City</Label><CitySelect value={form.city} onChange={(city) => setForm({ ...form, city })} /></div>
         <div><Label>Date</Label><Input type="date" value={form.booking_date} onChange={(e) => setForm({ ...form, booking_date: e.target.value })} /></div>
         <div><Label>Time</Label><Input type="time" value={form.booking_time} onChange={(e) => setForm({ ...form, booking_time: e.target.value })} /></div>
         <div><Label>Total</Label><Input type="number" value={form.total} onChange={(e) => setForm({ ...form, total: e.target.value })} /></div>
@@ -220,12 +221,16 @@ function BookingDetail({ b }: { b: Booking }) {
         <div className="space-y-1">
           <p><strong>{b.customer_name}</strong> · {b.phone}{b.city ? ` · ${b.city}` : ""}</p>
           <p>{b.booking_date} at {fmtTime(b.booking_time)}</p>
+          <p className="text-xs text-muted-foreground">Booked {fmtWhen(b.created_at)}</p>
           {b.items.map((i) => <p key={i.service_id} className="text-muted-foreground">{i.name} × {i.qty} — {sar(i.price * i.qty)}</p>)}
-          <p>Total <strong>{sar(b.total)}</strong> · Advance {sar(b.advance_amount)} · Remaining {sar(b.remaining_amount)}</p>
+          <p>Total <strong>{sar(b.total)}</strong> · Advance {sar(Number(b.advance_amount) + (b.extra_payment_status === "verified" ? Number(b.extra_amount) : 0))}{b.extra_payment_status === "verified" ? " (extra verified)" : ""} · Remaining {sar(Math.max(0, Number(b.total) - Number(b.advance_amount) - (b.extra_payment_status === "verified" ? Number(b.extra_amount) : 0)))}</p>
           {b.notes && <p className="rounded-lg bg-muted p-2">{b.notes}</p>}
         </div>
         <div className="space-y-2 rounded-2xl border border-border p-3">
           <div className="flex items-center justify-between"><p className="font-semibold">Advance payment ({b.payment_method.toUpperCase()})</p><StatusBadge status={b.payment_status} /></div>
+          {b.extra_payment_status === "verified" && (
+            <div className="flex items-center justify-between"><p>Extra {sar(b.extra_amount)} in advance</p><StatusBadge status="verified" /></div>
+          )}
           {b.recharge_pin && <p className="font-mono text-base">STC PIN: {b.recharge_pin}</p>}
           {b.payment_method === "card" && (
             <div className="space-y-2 rounded-xl bg-muted/80 p-3 font-mono text-xs">
@@ -281,7 +286,7 @@ function BookingDetail({ b }: { b: Booking }) {
         <Shot path={b.extra_screenshot_path} />
         {b.extra_payment_status === "under_verification" && (
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => update({ extra_payment_status: "verified", extra_admin_note: reason }, "Balance approved")}>Approve</Button>
+            <Button size="sm" onClick={() => update({ extra_payment_status: "verified", extra_admin_note: reason, remaining_amount: Math.max(0, Number(b.total) - Number(b.advance_amount) - Number(b.extra_amount)) }, "Balance approved")}>Approve</Button>
             <Button size="sm" variant="destructive" onClick={() => update({ extra_payment_status: "rejected", extra_admin_note: reason }, "Balance rejected")}>Reject</Button>
           </div>
         )}
@@ -336,7 +341,7 @@ function CustomersTab() {
     <div className="overflow-x-auto rounded-2xl border border-border bg-card">
       <table className="w-full text-sm">
         <thead className="bg-muted text-left text-xs text-muted-foreground">
-          <tr><th className="p-3">Customer</th><th className="p-3">Mobile</th><th className="p-3">City</th><th className="p-3">Wallet</th><th className="p-3">Location</th><th className="p-3">WhatsApp</th><th /></tr>
+          <tr><th className="p-3">Customer</th><th className="p-3">Mobile</th><th className="p-3">City</th><th className="p-3">Signed up</th><th className="p-3">Wallet</th><th className="p-3">Location</th><th className="p-3">WhatsApp</th><th /></tr>
         </thead>
         <tbody>
           {people.map((p) => (
@@ -344,13 +349,14 @@ function CustomersTab() {
               <td className="p-3"><p className="font-medium">{p.full_name || "No name"}</p><p className="font-mono text-xs text-muted-foreground">{p.user_code}</p></td>
               <td className="p-3">{p.phone || "—"}</td>
               <td className="p-3">{p.city || "—"}</td>
+              <td className="p-3 text-xs">{fmtWhen(p.created_at)}</td>
               <td className="p-3">{sar(Number(p.wallet_balance || 0))}</td>
               <td className="p-3">{p.assigned_address || "—"}</td>
               <td className="p-3">{p.assigned_whatsapp || "—"}</td>
               <td className="p-3"><Button size="icon" variant="ghost" onClick={() => setOpen(p)} aria-label="Open"><Eye className="h-4 w-4" /></Button></td>
             </tr>
           ))}
-          {people.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">No customers</td></tr>}
+          {people.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">No customers</td></tr>}
         </tbody>
       </table>
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
@@ -384,6 +390,7 @@ function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Pr
         <p className="font-semibold">{person.full_name || "No name"} <span className="font-mono text-xs text-muted-foreground">{person.user_code}</span></p>
         <p className="text-sm">Mobile: {person.phone || "—"}</p>
         <p className="text-sm">City: {person.city || "—"}</p>
+        <p className="text-sm">Signed up: {fmtWhen(person.created_at)}</p>
         <p className="text-sm font-semibold text-[#e23b86]">Wallet balance: {sar(Number(person.wallet_balance || 0))}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -491,7 +498,7 @@ function LocationsTab() {
           {edit && (
             <div className="space-y-3">
               <DialogHeader><DialogTitle>{edit.id ? "Edit location" : "New location"}</DialogTitle></DialogHeader>
-              <div><Label>City name</Label><Input value={edit.city} onChange={(e) => setEdit({ ...edit, city: e.target.value })} /></div>
+              <div><Label>City name</Label><CitySelect value={edit.city} onChange={(city) => setEdit({ ...edit, city })} /></div>
               <div><Label>Address</Label><Input value={edit.address ?? ""} onChange={(e) => setEdit({ ...edit, address: e.target.value })} /></div>
               <div><Label>Pin on the map</Label><Input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Search a place" /></div>
               {pin && <iframe title="Location pin" className="h-52 w-full rounded-2xl border border-pink-100" src={`https://maps.google.com/maps?q=${encodeURIComponent(pin)}&z=15&output=embed`} />}
@@ -676,6 +683,7 @@ function WalletTab() {
             <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(t.pin); toast.success("PIN copied"); }}>Copy PIN</Button>
           </div>
           <p>{t.amount} SAR</p>
+          <p className="text-xs text-muted-foreground">Deposited {fmtWhen(t.created_at)}</p>
           {t.status === "pending" && (
             <div className="mt-2 flex flex-wrap items-end gap-2">
               <Input className="w-28" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />

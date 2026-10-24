@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { KSA_CITIES } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,16 @@ export function StatusBadge({ status }: { status: string }) {
     <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold", tone[status] ?? "bg-muted")}>
       {label[status] ?? status}
     </span>
+  );
+}
+
+export function CitySelect({ id, value, onChange, className }: { id?: string; value: string; onChange: (v: string) => void; className?: string }) {
+  const options = value && !KSA_CITIES.includes(value) ? [value, ...KSA_CITIES] : KSA_CITIES;
+  return (
+    <select id={id} required value={value} onChange={(e) => onChange(e.target.value)} className={cn("h-11 w-full rounded-2xl border border-input bg-background px-3 text-sm", className)}>
+      <option value="">Select city</option>
+      {options.map((c) => <option key={c} value={c}>{c}</option>)}
+    </select>
   );
 }
 

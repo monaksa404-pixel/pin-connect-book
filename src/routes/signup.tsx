@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase, friendlyError, isSupabaseConfigured } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
 import { createAccount } from "@/lib/signup.functions";
+import { CitySelect } from "@/components/shared";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ function SignupPage() {
     e.preventDefault();
     if (!isSupabaseConfigured) { toast.error("Database is not connected yet."); return; }
     if (f.name.trim().length < 2) { toast.error("Enter your full name."); return; }
-    if (f.city.trim().length < 2) { toast.error("Enter your city."); return; }
+    if (!f.city) { toast.error("Select your city."); return; }
     if (f.password.length < 6) { toast.error("Password must be at least 6 characters."); return; }
     setBusy(true);
     const created = await createAccount({ data: { name: f.name.trim(), phone: f.phone.trim(), city: f.city.trim(), password: f.password } });
@@ -53,7 +54,7 @@ function SignupPage() {
       <form onSubmit={submit} className="space-y-4">
         <div><Label htmlFor="n" className="text-foreground">Name</Label><Input id="n" required maxLength={80} autoComplete="name" value={f.name} onChange={set("name")} className="mt-1 h-11" /></div>
         <div><Label htmlFor="ph" className="text-foreground">Mobile number</Label><Input id="ph" required maxLength={16} inputMode="tel" autoComplete="tel" placeholder="05xxxxxxxx" value={f.phone} onChange={set("phone")} className="mt-1 h-11" /></div>
-        <div><Label htmlFor="c" className="text-foreground">City</Label><Input id="c" required maxLength={80} autoComplete="address-level2" value={f.city} onChange={set("city")} className="mt-1 h-11" /></div>
+        <div><Label htmlFor="c" className="text-foreground">City</Label><CitySelect id="c" value={f.city} onChange={(city) => setF({ ...f, city })} className="mt-1" /></div>
         <div><Label htmlFor="pw" className="text-foreground">Password</Label><Input id="pw" type="password" required minLength={6} autoComplete="new-password" value={f.password} onChange={set("password")} className="mt-1 h-11" /></div>
         <Button disabled={busy} className="h-12 w-full rounded-full">{busy ? "Creating…" : "Create account"}</Button>
       </form>
