@@ -153,17 +153,22 @@ export function timeSlots(open: string, close: string): string[] {
 }
 
 export const KSA_CITIES = [
-  "Abha", "Abu Arish", "Ad Darb", "Ad Dilam", "Ad Diriyah", "Afif", "Ahad Al Masarihah", "Ahad Rafidah",
+  "Abha", "Abqaiq", "Abu Arish", "Ad Darb", "Ad Dilam", "Ad Diriyah", "Afif", "Ahad Al Masarihah", "Ahad Rafidah",
   "Al Ahsa", "Al Ais", "Al Aridah", "Al Artawiyah", "Al Bad", "Al Bahah", "Al Birk", "Al Bukayriyah",
   "Al Duwadimi", "Al Ghat", "Al Hair", "Al Hariq", "Al Henakiyah", "Al Jumum", "Al Kamil", "Al Kharj",
-  "Al Khobar", "Al Lith", "Al Majmaah", "Al Makhwah", "Al Mithnab", "Al Mubarraz", "Al Muwayh", "Al Namas",
-  "Al Qatif", "Al Qurayyat", "Al Quwayiyah", "Al Ula", "Al Wajh", "Ar Rass", "Arar", "As Sulayyil",
-  "Badr", "Baish", "Baljurashi", "Bariq", "Bisha", "Buraydah", "Dammam", "Dhahran", "Duba", "Dumat Al Jandal",
-  "Farasan", "Hafr Al Batin", "Hail", "Hotat Bani Tamim", "Jeddah", "Jizan", "Khafji", "Khamis Mushait",
-  "Khaybar", "Khulais", "Mecca", "Medina", "Muhayil", "Najran", "Qilwah", "Rabigh", "Rafha", "Ranyah",
-  "Ras Tanura", "Riyadh", "Sabya", "Safwa", "Saihat", "Sakaka", "Samtah", "Sarat Abidah", "Sharurah",
-  "Shaqra", "Tabuk", "Taif", "Tanomah", "Tarut", "Tayma", "Thadiq", "Tubarjal", "Turaif", "Turubah",
-  "Umluj", "Unaizah", "Wadi Al Dawasir", "Yanbu", "Zulfi",
+  "Al Khobar", "Al Lith", "Al Majmaah", "Al Makhwah", "Al Mawain", "Al Mithnab", "Al Mubarraz", "Al Muwayh", "Al Namas",
+  "Al Qadeeh", "Al Qatif", "Al Qunfudhah", "Al Qurayn", "Al Qurayyat", "Al Quwayiyah", "Al Ula", "Al Wajh",
+  "Al-Abwa", "Al-Dayer", "Al-Hufuf", "Al-Jawf", "Al-Omran", "Al-Oyoon",
+  "Ar Rass", "Arar", "As Sulayyil",
+  "Badr", "Baish", "Baljurashi", "Bariq", "Bisha", "Buraydah", "Dammam", "Dhahran", "Dhurma", "Duba", "Dumat Al Jandal",
+  "Farasan", "Gatgat", "Gerrha", "Ghawiyah", "Hafr Al Batin", "Hail", "Hajrah", "Haql", "Harmah", "Hotat Bani Tamim", "Huraymila",
+  "Jabal Umm al Ru'us", "Jalajil", "Jeddah", "Jizan", "Jubail",
+  "Khafji", "Khamis Mushait", "Khaybar", "Khulais", "King Abdullah Economic City", "King Khalid Military City",
+  "Layla", "Lihyan", "Mecca", "Medina", "Muhayil", "Muzahmiyya", "Najran",
+  "Qadeimah", "Qaisumah", "Qilwah", "Rabigh", "Rafha", "Ranyah", "Ras Tanura", "Riyadh", "Riyadh Al-Khabra",
+  "Sabya", "Safwa", "Saihat", "Sakaka", "Samtah", "Sarat Abidah", "Sharurah", "Shaqra",
+  "Tabuk", "Taif", "Tanomah", "Tarut", "Tayma", "Thadiq", "Thuqbah", "Thuwal", "Tubarjal", "Turaif", "Turubah",
+  "Umluj", "Unaizah", "Uqair", "Uyayna", "Uyun AlJiwa", "Wadi Al Dawasir", "Yanbu", "Zulfi",
 ];
 
 export const fmtTime = (t: string) => {
