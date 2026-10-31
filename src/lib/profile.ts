@@ -56,13 +56,19 @@ export function useProfile() {
   });
 }
 
-/** The bank account the admin assigned to the signed-in customer (RLS only returns that one). */
 export function useAssignedBank(bankId: string | null | undefined) {
   return useQuery({
     queryKey: ["assigned-bank", bankId],
-    enabled: !!bankId && isSupabaseConfigured,
+    enabled: isSupabaseConfigured,
     queryFn: async () => {
-      const { data } = await supabase.from("bank_accounts").select("*").eq("id", bankId!).maybeSingle();
+      const rpc = await supabase.rpc("my_bank");
+      const row = (Array.isArray(rpc.data) ? rpc.data[0] : rpc.data) as BankAccount | null;
+      if (!rpc.error && row?.id) return row;
+      if (bankId) {
+        const { data } = await supabase.from("bank_accounts").select("*").eq("id", bankId).eq("active", true).maybeSingle();
+        if (data) return data as BankAccount;
+      }
+      const { data } = await supabase.from("bank_accounts").select("*").eq("active", true).order("created_at", { ascending: false }).limit(1).maybeSingle();
       return (data as BankAccount | null) ?? null;
     },
   });

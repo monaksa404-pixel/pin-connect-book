@@ -35,7 +35,17 @@ export function PaymentForm({
   only?: "bank" | "wallet";
 }) {
   const { data: profile } = useProfile();
-  const { data: bank } = useAssignedBank(profile?.bank_account_id);
+  const { data: assigned } = useAssignedBank(profile?.bank_account_id);
+  const bank = assigned ?? (settings.iban || settings.account_number ? {
+    id: "settings",
+    account_name: settings.account_holder,
+    bank_name: settings.bank_name,
+    account_holder: settings.account_holder,
+    account_number: settings.account_number,
+    iban: settings.iban,
+    qr_url: settings.bank_qr_url,
+    active: true,
+  } : null);
   const bankOn = settings.bank_enabled && (profile?.allow_bank ?? true) && !!bank;
   const walletOn = settings.stc_enabled && (profile?.allow_wallet ?? true);
   const balance = Number(profile?.wallet_balance ?? 0);

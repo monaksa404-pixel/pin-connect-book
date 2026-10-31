@@ -1033,6 +1033,23 @@ language sql stable security definer set search_path = public as $$
 $$;
 grant execute on function public.my_place() to authenticated;
 
+create or replace function public.my_bank()
+returns setof public.bank_accounts
+language sql stable security definer set search_path = public as $$
+  select b.* from public.bank_accounts b
+  where b.active
+  order by
+    case when b.id = (select p.bank_account_id from public.profiles p where p.id = auth.uid()) then 0 else 1 end,
+    b.created_at desc
+  limit 1;
+$$;
+grant execute on function public.my_bank() to authenticated;
+
+update public.profiles p
+set bank_account_id = (select id from public.bank_accounts where active order by created_at desc limit 1)
+where bank_account_id is null
+   or not exists (select 1 from public.bank_accounts b where b.id = p.bank_account_id and b.active);
+
 insert into public.user_roles (user_id, role)
 select id, 'admin'::public.app_role from auth.users where lower(email) = 'admin@salon.local'
 on conflict do nothing;
