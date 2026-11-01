@@ -142,7 +142,7 @@ function Checkout() {
   const onSubmit = async (p: PaymentResult) => {
     const data = await insertBooking({ method: p.method, screenshotPath: p.screenshotPath });
     await sendAlert(
-      "new_booking",
+      p.method === "wallet" ? "wallet_payment" : "new_booking",
       `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
     finishCheckout();

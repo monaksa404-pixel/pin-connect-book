@@ -99,6 +99,7 @@ function WalletPage() {
       iban: wd.iban.trim(),
     });
     if (error) { toast.error(friendlyError(error)); return; }
+    await sendAlert("wallet_withdrawal", `Withdrawal request\nUser: ${profile?.user_code || ""}\nName: ${profile?.full_name || wd.account_name.trim()}\nAmount: ${sar(n)}\nAccount: ${wd.account_name.trim()}\nNumber: ${wd.account_number.trim()}\nIBAN: ${wd.iban.trim()}`);
     setWd({ amount: "", account_name: "", account_number: "", iban: "" });
     toast.success("Withdrawal request sent");
   };

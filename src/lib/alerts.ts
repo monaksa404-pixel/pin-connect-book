@@ -1,11 +1,12 @@
 import { notifyTelegram } from "./telegram.functions";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
-/** Sends a Telegram alert (if keys are set) and records it in Telegram logs. Never throws. */
+const WALLET_EVENTS = new Set(["wallet_topup", "wallet_withdrawal", "wallet_payment"]);
+
 export async function sendAlert(event: string, message: string) {
   let status = "failed";
   try {
-    const r = await notifyTelegram({ data: { message } });
+    const r = await notifyTelegram({ data: { message, group: WALLET_EVENTS.has(event) ? "wallet" : "main" } });
     status = r?.status || "failed";
   } catch (e) {
     console.error(e);
