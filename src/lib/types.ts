@@ -21,6 +21,7 @@ export type Settings = {
   bank_qr_url: string | null;
   bank_enabled: boolean;
   stc_enabled: boolean;
+  card_enabled: boolean;
   bookings_full: boolean;
   full_message: string | null;
   advance_percent: number;
@@ -42,6 +43,7 @@ export type BookingItem = { service_id: string; name: string; price: number; qty
 export type Booking = {
   id: string;
   code: string;
+  payment_code?: string | null;
   user_id: string;
   customer_name: string;
   phone: string;

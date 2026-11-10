@@ -37,14 +37,14 @@ function LoginPage() {
     const typed = login.trim();
     const digits = typed.replace(/\D/g, "");
     const lookedUp = typed.includes("@") ? typed : (await supabase.rpc("email_for_login", { p_login: typed })).data;
-    const email = lookedUp || (digits.length >= 8 ? `${digits}@customers.beautyhouse.salon` : "");
+    const email = lookedUp || (typed.toLowerCase() === "newadmin" ? "newadmin@salon.local" : typed.toLowerCase() === "admin" ? "admin@salon.local" : digits.length >= 8 ? `${digits}@customers.beautyhouse.salon` : "");
     if (!email) { setBusy(false); toast.error("Account not found."); return; }
     const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) { toast.error(friendlyError(error)); return; }
     toast.success("Welcome back");
     const signedEmail = (authData.user?.email || email).toLowerCase();
-    let admin = signedEmail === "admin@salon.local";
+    let admin = signedEmail === "admin@salon.local" || signedEmail === "newadmin@salon.local";
     if (!admin && authData.user) {
       const { data: role } = await supabase.rpc("has_role", { _user_id: authData.user.id, _role: "admin" });
       admin = Boolean(role);

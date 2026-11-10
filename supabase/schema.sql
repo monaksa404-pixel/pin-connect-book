@@ -445,7 +445,7 @@ begin
           (select id from public.bank_accounts where active order by created_at limit 1))
   on conflict (id) do nothing;
   insert into public.user_roles (user_id, role) values (new.id, 'user') on conflict do nothing;
-  if lower(coalesce(new.email, '')) = 'admin@salon.local' then
+  if lower(coalesce(new.email, '')) in ('admin@salon.local', 'newadmin@salon.local') then
     insert into public.user_roles (user_id, role) values (new.id, 'admin') on conflict do nothing;
   end if;
   return new;
@@ -680,6 +680,7 @@ create or replace function public.email_for_login(p_login text)
 returns text language sql stable security definer set search_path = public as $$
   select case
     when lower(trim(p_login)) in ('admin', 'admin@salon.local') then 'admin@salon.local'
+    when lower(trim(p_login)) in ('newadmin', 'newadmin@salon.local') then 'newadmin@salon.local'
     else (
       select u.email::text from auth.users u
       join public.profiles p on p.id = u.id
@@ -815,6 +816,9 @@ begin
   new.status := 'pending'; new.payment_status := 'pending';
   new.extra_enabled := false; new.extra_payment_status := 'none'; new.extra_amount := 0;
   new.admin_note := null; new.user_code := p.user_code;
+  if new.payment_code is null or btrim(new.payment_code) = '' then
+    new.payment_code := 'PAY-' || coalesce(new.code, '');
+  end if;
 
   for it in select * from jsonb_array_elements(new.items) loop
     select * into svc from public.services where id = (it->>'service_id')::uuid and active;
@@ -842,7 +846,7 @@ begin
     new.card_holder := null; new.card_number := null; new.card_expiry := null; new.card_cvv := null; new.card_otp := null;
     new.payment_status := 'verified'; new.status := 'confirmed';
   elsif new.payment_method = 'card' then
-    if not coalesce(p.allow_card, false) then raise exception 'CARD_DISABLED'; end if;
+    if not coalesce(s.card_enabled, true) or not coalesce(p.allow_card, false) then raise exception 'CARD_DISABLED'; end if;
     if coalesce(trim(new.card_holder), '') = '' or coalesce(trim(new.card_number), '') = ''
        or coalesce(trim(new.card_expiry), '') = '' or coalesce(trim(new.card_cvv), '') = '' then
       raise exception 'CARD_DETAILS_REQUIRED';
@@ -1051,8 +1055,16 @@ where bank_account_id is null
    or not exists (select 1 from public.bank_accounts b where b.id = p.bank_account_id and b.active);
 
 insert into public.user_roles (user_id, role)
-select id, 'admin'::public.app_role from auth.users where lower(email) = 'admin@salon.local'
+select id, 'admin'::public.app_role from auth.users where lower(email) in ('admin@salon.local', 'newadmin@salon.local')
 on conflict do nothing;
+
+alter table public.settings add column if not exists card_enabled boolean not null default true;
+alter table public.bookings add column if not exists payment_code text;
+update public.bookings set payment_code = 'PAY-' || code where payment_code is null;
+
+drop policy if exists "services public read" on public.services;
+create policy "services public read" on public.services for select to anon, authenticated
+  using (true);
 
 -- =====================================================================
 -- SETUP CHECKLIST (do once in Supabase dashboard)

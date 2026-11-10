@@ -42,12 +42,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (ready) localStorage.setItem(KEY, JSON.stringify({ lines, slot }));
   }, [lines, slot, ready]);
 
-  const add = (s: Service) =>
+  const add = (s: Service) => {
+    if (s.active === false) return;
     setLines((ls) => {
       const f = ls.find((l) => l.service.id === s.id);
       if (f) return ls.map((l) => (l.service.id === s.id ? { ...l, qty: Math.min(10, l.qty + 1) } : l));
       return [...ls, { service: s, qty: 1 }];
     });
+  };
   const setQty = (id: string, qty: number) =>
     setLines((ls) =>
       qty <= 0 ? ls.filter((l) => l.service.id !== id) : ls.map((l) => (l.service.id === id ? { ...l, qty: Math.min(10, qty) } : l)),

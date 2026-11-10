@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { sendAlert } from "@/lib/alerts";
 import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, fmtWhen, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
 import type { BankAccount, Booking, Profile, SalonLocation, Service, Settings, Topup, WhatsappNumber } from "@/lib/types";
 import { CitySelect, RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
@@ -92,7 +93,7 @@ function BookingsTab() {
   const stats = {
     today: data.filter((b) => b.booking_date === new Date().toISOString().slice(0, 10)).length,
     pending: data.filter((b) => b.payment_status === "pending").length,
-    revenue: data.filter((b) => b.payment_status === "verified").reduce((a, b) => a + Number(b.advance_amount), 0),
+    revenue: verifiedAdvances(data).total,
   };
 
   const toggleFull = async () => {
@@ -113,6 +114,7 @@ function BookingsTab() {
           <p className={cn("font-semibold", settings.bookings_full && "text-destructive")}>{settings.bookings_full ? "Bookings CLOSED — tap to reopen" : "Open — tap to close"}</p>
         </button>
       </div>
+      <VerifiedReport rows={data} />
       <div className="flex flex-wrap gap-2">
         {[["all", "All"], ["pay", "Needs verification"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["completed", "Completed"], ["cancelled", "Cancelled"]].map(([v, l]) => (
           <Button key={v} size="sm" variant={filter === v ? "default" : "outline"} className="rounded-full" onClick={() => setFilter(v!)}>{l}</Button>
@@ -146,6 +148,35 @@ function BookingsTab() {
           {open && <BookingDetail b={data.find((x) => x.id === open.id) ?? open} />}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function methodKey(method: string | null | undefined) {
+  if (method === "wallet" || method === "stc") return "wallet" as const;
+  if (method === "card") return "card" as const;
+  return "bank" as const;
+}
+
+function verifiedAdvances(rows: Booking[]) {
+  const totals = { bank: 0, wallet: 0, card: 0 };
+  for (const b of rows) {
+    if (b.payment_status === "verified") totals[methodKey(b.payment_method)] += Number(b.advance_amount) || 0;
+    if (b.extra_payment_status === "verified") totals[methodKey(b.extra_method || b.payment_method)] += Number(b.extra_amount) || 0;
+  }
+  return { ...totals, total: totals.bank + totals.wallet + totals.card };
+}
+
+function VerifiedReport({ rows }: { rows: Booking[] }) {
+  const t = verifiedAdvances(rows);
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <p className="text-sm font-semibold">Verified advances by payment method</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Stat k="Wallet balance" v={sar(t.wallet)} />
+        <Stat k="Credit/Debit card balance" v={sar(t.card)} />
+        <Stat k="Bank transfer balance" v={sar(t.bank)} />
+      </div>
     </div>
   );
 }
@@ -194,7 +225,15 @@ function BookingDetail({ b }: { b: Booking }) {
 
   return (
     <>
-      <DialogHeader><DialogTitle className="font-display text-2xl">Booking {b.code}</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle className="font-display text-2xl">Booking {b.code}</DialogTitle>
+        <div className="grid gap-1 rounded-xl bg-muted p-3 font-mono text-xs">
+          <p>Booking ID: {b.id}</p>
+          <p>Booking Code: {b.code}</p>
+          <p>Payment Code: {b.payment_code || `PAY-${b.code}`}</p>
+          <p>Customer Code: {b.user_code || "—"}</p>
+        </div>
+      </DialogHeader>
       <div className="grid gap-2 sm:grid-cols-2">
         <div><Label>Name</Label><Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
         <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
@@ -257,9 +296,10 @@ function BookingDetail({ b }: { b: Booking }) {
                 if (error) { toast.error(error.message); return; }
               }
               toast.success("Payment approved");
+              await sendAlert("payment_approved", `Payment approved\nBooking ${b.code}\nPayment ${b.payment_code || `PAY-${b.code}`}\nCustomer ${b.user_code ?? ""}\n${b.payment_method}\n${sar(Number(b.advance_amount))}`);
               qc.invalidateQueries({ queryKey: ["admin-bookings"] });
             }}>Approve</Button>
-            <Button size="sm" variant="destructive" onClick={() => update({ payment_status: "rejected", admin_note: reason }, "Payment rejected")}>Reject</Button>
+            <Button size="sm" variant="destructive" onClick={async () => { await update({ payment_status: "rejected", admin_note: reason }, "Payment rejected"); await sendAlert("payment_rejected", `Payment rejected\nBooking ${b.code}\nPayment ${b.payment_code || `PAY-${b.code}`}\nCustomer ${b.user_code ?? ""}\n${b.payment_method}\n${reason || ""}`); }}>Reject</Button>
           </div>
         </div>
       </div>
@@ -272,7 +312,7 @@ function BookingDetail({ b }: { b: Booking }) {
         </div>
       </div>
       <div className="space-y-2 rounded-2xl border border-border p-3">
-        <div className="flex items-center justify-between"><p className="font-semibold">Remaining balance online</p><StatusBadge status={b.extra_payment_status} /></div>
+        <div className="flex items-center justify-between"><p className="font-semibold">Balance Adjust</p><StatusBadge status={b.extra_payment_status} /></div>
         <p className="text-xs text-muted-foreground">Turn on to show the customer a popup asking them to pay the remaining balance online instead of cash.</p>
         <div className="flex flex-wrap items-end gap-2">
           <div><Label htmlFor="ex">Amount (SAR)</Label><Input id="ex" type="number" min={1} value={extra} onChange={(e) => setExtra(e.target.value)} className="w-32" /></div>
@@ -286,8 +326,8 @@ function BookingDetail({ b }: { b: Booking }) {
         <Shot path={b.extra_screenshot_path} />
         {b.extra_payment_status === "under_verification" && (
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => update({ extra_payment_status: "verified", extra_admin_note: reason, remaining_amount: Math.max(0, Number(b.total) - Number(b.advance_amount) - Number(b.extra_amount)) }, "Balance approved")}>Approve</Button>
-            <Button size="sm" variant="destructive" onClick={() => update({ extra_payment_status: "rejected", extra_admin_note: reason }, "Balance rejected")}>Reject</Button>
+            <Button size="sm" onClick={async () => { await update({ extra_payment_status: "verified", extra_admin_note: reason, remaining_amount: Math.max(0, Number(b.total) - Number(b.advance_amount) - Number(b.extra_amount)) }, "Balance approved"); await sendAlert("payment_approved", `Balance payment approved\nBooking ${b.code}\nCustomer ${b.user_code ?? ""}\n${b.extra_method || b.payment_method}\n${sar(Number(b.extra_amount))}`); }}>Approve</Button>
+            <Button size="sm" variant="destructive" onClick={async () => { await update({ extra_payment_status: "rejected", extra_admin_note: reason }, "Balance rejected"); await sendAlert("payment_rejected", `Balance payment rejected\nBooking ${b.code}\nCustomer ${b.user_code ?? ""}\n${b.extra_method || b.payment_method}\n${reason || ""}`); }}>Reject</Button>
           </div>
         )}
       </div>
@@ -763,8 +803,16 @@ function ServicesTab() {
             <img src={serviceImage(s)} alt={s.name} className="mb-3 h-32 w-full rounded-xl object-cover" />
             <div className="flex justify-between gap-2">
               <div><p className="font-semibold">{s.name}</p><p className="text-xs text-muted-foreground">{s.category} · {sar(s.price)} · {s.duration_min} min</p></div>
-              {!s.active && <span className="text-xs text-destructive">Hidden</span>}
+              <span className={cn("text-xs font-semibold", s.active ? "text-emerald-700" : "text-destructive")}>{s.active ? "Active" : "OFF"}</span>
             </div>
+            <label className="mt-3 flex items-center justify-between text-sm">
+              <span>{s.active ? "Active" : "OFF"}</span>
+              <Switch checked={s.active} onCheckedChange={async (v) => {
+                const { error } = await supabase.from("services").update({ active: v }).eq("id", s.id);
+                if (error) { toast.error(error.message); return; }
+                refresh();
+              }} />
+            </label>
             <div className="mt-3 flex gap-2">
               <Button size="sm" variant="outline" onClick={() => setEdit({ ...s, price: Number(s.price) })}>Edit</Button>
               <Button size="sm" variant="ghost" className="text-destructive" onClick={() => del(s.id)}>Delete</Button>
@@ -796,7 +844,7 @@ function ServicesTab() {
               </div>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm"><Switch checked={edit.popular} onCheckedChange={(v) => setEdit({ ...edit, popular: v })} />Popular — shows HOT 🔥</label>
-                <label className="flex items-center gap-2 text-sm"><Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} />Visible</label>
+                <label className="flex items-center gap-2 text-sm"><Switch checked={edit.active} onCheckedChange={(v) => setEdit({ ...edit, active: v })} />Active</label>
               </div>
               <Button className="w-full" onClick={save}>Save</Button>
             </div>
@@ -859,7 +907,7 @@ function SettingsTab() {
   const text = (k: keyof Settings, l: string, type = "text") => (
     <div><Label>{l}</Label><Input type={type} value={String(cur[k] ?? "")} onChange={(e) => set(k, e.target.value as never)} /></div>
   );
-  const toggle = (k: "bank_enabled" | "stc_enabled" | "bookings_full", l: string) => (
+  const toggle = (k: "bank_enabled" | "stc_enabled" | "card_enabled" | "bookings_full", l: string) => (
     <label className="flex items-center justify-between rounded-xl border border-border p-3 text-sm"><span>{l}</span><Switch checked={cur[k]} onCheckedChange={(v) => set(k, v)} /></label>
   );
 
@@ -871,6 +919,7 @@ function SettingsTab() {
         {text("full_message", "Message shown when full")}
         {toggle("bank_enabled", "Bank transfer enabled")}
         {toggle("stc_enabled", "Wallet recharge (STC Sawa) enabled")}
+        {toggle("card_enabled", "Credit/Debit card enabled")}
         {text("advance_percent", "Advance %", "number")}
         <div className="grid grid-cols-3 gap-2">{text("open_time", "Opens", "time")}{text("close_time", "Closes", "time")}{text("slot_minutes", "Slot (min)", "number")}</div>
       </section>

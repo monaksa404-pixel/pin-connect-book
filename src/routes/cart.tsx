@@ -49,7 +49,7 @@ function CartPage() {
       return h * 60 + m > nowMin;
     });
   }, [picked, settings.open_time, settings.close_time, ksa.date, ksa.hour, ksa.minute]);
-  const extra = services.filter((s) => !lines.some((l) => l.service.id === s.id)).slice(0, 4);
+  const extra = services.filter((s) => s.active !== false && !lines.some((l) => l.service.id === s.id)).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-[#fff0f6] px-4 pb-28 pt-4 md:pb-10">

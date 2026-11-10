@@ -16,7 +16,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const load = async (user: User | null) => {
       let isAdmin = false;
       if (user) {
-        isAdmin = (user.email ?? "").toLowerCase() === "admin@salon.local";
+        isAdmin = ["admin@salon.local", "newadmin@salon.local"].includes((user.email ?? "").toLowerCase());
         if (!isAdmin) {
           const { data } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
           isAdmin = Boolean(data);

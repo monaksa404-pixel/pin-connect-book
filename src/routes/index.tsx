@@ -108,17 +108,21 @@ function Index() {
                 <span className="text-[#ff4d94]">{sar(s.price)}</span>
                 <span className="flex items-center gap-1 text-[#9a5b78]"><Clock className="h-4 w-4 text-[#ff4d94]" />{s.duration_min} min</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (settings.bookings_full) { setFullOpen(true); return; }
-                  add(s);
-                  toast.success(`${s.name} added to cart`);
-                }}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ff4d94] py-2.5 text-sm font-semibold text-white"
-              >
-                <ShoppingCart className="h-4 w-4" /> Add to Cart
-              </button>
+              {s.active === false ? (
+                <p className="mt-2 rounded-full bg-pink-100 py-2.5 text-center text-sm font-semibold text-[#9a5b78]">Temporarily Unavailable</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (settings.bookings_full) { setFullOpen(true); return; }
+                    add(s);
+                    toast.success(`${s.name} added to cart`);
+                  }}
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-full bg-[#ff4d94] py-2.5 text-sm font-semibold text-white"
+                >
+                  <ShoppingCart className="h-4 w-4" /> Add to Cart
+                </button>
+              )}
             </article>
           ))}
         </div>

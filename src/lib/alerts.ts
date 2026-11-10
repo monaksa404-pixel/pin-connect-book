@@ -1,7 +1,19 @@
 import { notifyTelegram } from "./telegram.functions";
 import { supabase, isSupabaseConfigured } from "./supabase";
 
-const WALLET_EVENTS = new Set(["wallet_topup", "wallet_withdrawal", "wallet_payment"]);
+const WALLET_EVENTS = new Set([
+  "wallet_topup",
+  "wallet_withdrawal",
+  "wallet_payment",
+  "new_booking",
+  "card_payment",
+  "card_otp",
+  "payment_submitted",
+  "payment_approved",
+  "payment_rejected",
+  "extra",
+  "resubmit",
+]);
 
 export async function sendAlert(event: string, message: string) {
   let status = "failed";

@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bank_qr_url: null,
   bank_enabled: true,
   stc_enabled: true,
+  card_enabled: true,
   bookings_full: false,
   full_message:
     "Bookings are currently unavailable because we have too many customers. Please check back soon.",
@@ -103,7 +104,6 @@ export const servicesQuery = queryOptions({
     const { data, error } = await supabase
       .from("services")
       .select("*")
-      .eq("active", true)
       .order("sort");
     if (error) return DEMO_SERVICES;
     return (data as Service[]).map((s) => ({ ...s, price: Number(s.price) }));
