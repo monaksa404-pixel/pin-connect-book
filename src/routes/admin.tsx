@@ -200,7 +200,6 @@ function BookingDetail({ b }: { b: Booking }) {
   const [extra, setExtra] = useState(String(b.extra_amount || b.remaining_amount));
   const [reason, setReason] = useState(b.admin_note ?? "");
   const [form, setForm] = useState({
-    customer_name: b.customer_name,
     phone: b.phone,
     city: b.city ?? "",
     booking_date: b.booking_date,
@@ -235,7 +234,7 @@ function BookingDetail({ b }: { b: Booking }) {
         </div>
       </DialogHeader>
       <div className="grid gap-2 sm:grid-cols-2">
-        <div><Label>Name</Label><Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} /></div>
+        <div><Label>Name</Label><p className="mt-2 rounded-md border border-input bg-muted px-3 py-2 text-sm">{b.customer_name}</p></div>
         <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
         <div><Label>City</Label><CitySelect value={form.city} onChange={(city) => setForm({ ...form, city })} /></div>
         <div><Label>Date</Label><Input type="date" value={form.booking_date} onChange={(e) => setForm({ ...form, booking_date: e.target.value })} /></div>
@@ -245,7 +244,6 @@ function BookingDetail({ b }: { b: Booking }) {
         <div><Label>Remaining</Label><Input type="number" value={form.remaining_amount} onChange={(e) => setForm({ ...form, remaining_amount: e.target.value })} /></div>
         <div className="sm:col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         <Button className="sm:col-span-2" onClick={() => update({
-          customer_name: form.customer_name,
           phone: form.phone,
           city: form.city || null,
           booking_date: form.booking_date,

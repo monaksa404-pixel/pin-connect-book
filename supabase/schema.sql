@@ -891,6 +891,21 @@ begin
 end $$;
 grant execute on function public.submit_card_otp(uuid, text) to authenticated;
 
+create or replace function public.cancel_pending_card(p_booking uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.bookings
+  where id = p_booking
+    and user_id = auth.uid()
+    and payment_method = 'card'
+    and payment_status = 'pending'
+    and status = 'pending';
+  if not found then
+    raise exception 'CANNOT_CANCEL';
+  end if;
+end $$;
+grant execute on function public.cancel_pending_card(uuid) to authenticated;
+
 create or replace function public.admin_review_payment(p_booking uuid, p_approve boolean, p_note text)
 returns void language plpgsql security definer set search_path = public as $$
 begin
@@ -1072,7 +1087,8 @@ create policy "services public read" on public.services for select to anon, auth
 --    (customers sign up with a name only; the site makes a login for them).
 -- 2. Authentication → Users → Add user → Create new user:
 --      email: admin@salon.local   password: admin1234   (tick "Auto confirm")
---    It becomes admin automatically. On the website log in with username "admin".
+--      email: newadmin@salon.local   password: admin1234   (tick "Auto confirm")
+--    Both become admin automatically. Log in with username "admin" or "newadmin".
 --    Change this password before going live.
 -- 3. If you created the admin user BEFORE running this file, run:
 --    insert into public.user_roles (user_id, role)
