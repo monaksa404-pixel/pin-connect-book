@@ -233,6 +233,21 @@ function BookingDetail({ b }: { b: Booking }) {
           <p>Customer Code: {b.user_code || "—"}</p>
         </div>
       </DialogHeader>
+      <div className="space-y-2 rounded-2xl border border-border p-3">
+        <p className="font-semibold">Adjust balance</p>
+        <p className="text-xs text-muted-foreground">Current remaining {sar(Number(b.remaining_amount))}</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <Label htmlFor="bal">New remaining (SAR)</Label>
+            <Input id="bal" type="number" min={0} value={form.remaining_amount} onChange={(e) => setForm({ ...form, remaining_amount: e.target.value })} className="w-40" />
+          </div>
+          <Button size="sm" onClick={() => {
+            const n = Number(form.remaining_amount);
+            if (!Number.isFinite(n) || n < 0) { toast.error("Enter a valid balance"); return; }
+            update({ remaining_amount: n }, "Balance adjusted");
+          }}>Adjust balance</Button>
+        </div>
+      </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div><Label>Name</Label><p className="mt-2 rounded-md border border-input bg-muted px-3 py-2 text-sm">{b.customer_name}</p></div>
         <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
