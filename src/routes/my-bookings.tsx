@@ -133,7 +133,7 @@ function MyBookings() {
                   </div>
                   <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-2xl bg-[#fff5f9] text-center">
                     <div className="px-1 py-2"><p className="text-[11px] text-[#9a5b78]">Total</p><p className="text-sm font-semibold text-[#3d2030]">{sar(b.total)}</p></div>
-                    <div className="border-x border-pink-100 px-1 py-2"><p className="text-[11px] text-[#9a5b78]">Advance</p><p className="text-sm font-semibold text-[#3d2030]">{sar(advanceShown)}</p>{extraPaid > 0 && <p className="text-[10px] font-semibold text-emerald-700">Verified</p>}</div>
+                    <div className="border-x border-pink-100 px-1 py-2"><p className="text-[11px] text-[#9a5b78]">Advance</p><p className="text-sm font-semibold text-[#3d2030]">{sar(advanceShown)}</p>{extraPaid > 0 && <p className="text-[10px] font-semibold text-emerald-700">Verified in advance</p>}</div>
                     <div className="px-1 py-2"><p className="text-[11px] text-[#9a5b78]">At salon</p><p className="text-sm font-semibold text-[#3d2030]">{sar(atSalon)}</p></div>
                   </div>
                   {b.payment_status === "pending" && (

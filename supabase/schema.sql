@@ -593,7 +593,15 @@ begin
     if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
     if p_screenshot is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
     update public.bookings set extra_method = 'bank', extra_screenshot_path = p_screenshot,
-      extra_payment_status = 'under_verification', extra_admin_note = null where id = p_booking;
+      extra_payment_status = 'verified', extra_admin_note = 'Paid again.',
+      remaining_amount = greatest(0, coalesce(b.total, 0) - coalesce(b.advance_amount, 0) - coalesce(b.extra_amount, 0))
+      where id = p_booking;
+  elsif p_method = 'card' then
+    if coalesce(s.card_enabled, true) = false or coalesce(p.allow_card, true) = false then raise exception 'CARD_DISABLED'; end if;
+    update public.bookings set extra_method = 'card', extra_screenshot_path = null,
+      extra_payment_status = 'verified', extra_admin_note = 'Paid again.',
+      remaining_amount = greatest(0, coalesce(b.total, 0) - coalesce(b.advance_amount, 0) - coalesce(b.extra_amount, 0))
+      where id = p_booking;
   elsif p_method = 'wallet' then
     if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
     if p.wallet_balance < b.extra_amount then raise exception 'LOW_BALANCE'; end if;
@@ -604,6 +612,9 @@ begin
 end $$;
 grant execute on function public.resubmit_payment(uuid, text, text) to authenticated;
 grant execute on function public.submit_extra_payment(uuid, text, text) to authenticated;
+
+alter table public.bookings drop constraint if exists bookings_extra_method_check;
+alter table public.bookings add constraint bookings_extra_method_check check (extra_method is null or extra_method in ('bank', 'wallet', 'card'));
 
 -- ---------- Wallet top-ups (STC Sawa PIN) ----------
 create table if not exists public.wallet_topups (
@@ -1111,6 +1122,12 @@ for each row execute function public.refund_wallet_on_cancel();
 alter table public.settings add column if not exists card_enabled boolean not null default true;
 alter table public.bookings add column if not exists payment_code text;
 update public.bookings set payment_code = 'PAY-' || code where payment_code is null;
+
+update public.bookings
+set extra_payment_status = 'verified',
+    extra_admin_note = coalesce(nullif(trim(extra_admin_note), ''), 'Verified in advance')
+where coalesce(extra_amount, 0) > 0
+  and extra_payment_status in ('under_verification', 'awaiting');
 
 create table if not exists public.verified_advances (
   id uuid primary key default gen_random_uuid(),

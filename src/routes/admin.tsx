@@ -135,7 +135,7 @@ function BookingsTab() {
                 <td className="p-3">{sar(b.total)}</td>
                 <td className="p-3"><StatusBadge status={b.payment_status} />{b.payment_status === "verified" && <p className="mt-1 text-xs font-semibold text-emerald-700">Payment verified</p>}<p className="mt-1 text-xs uppercase text-muted-foreground">{b.payment_method}</p>{b.extra_payment_status === "verified" && <p className="mt-1 text-xs font-semibold text-emerald-700">Extra {sar(b.extra_amount)} verified in advance</p>}</td>
                 <td className="p-3"><StatusBadge status={b.status} /></td>
-                <td className="p-3"><StatusBadge status={b.extra_payment_status} /></td>
+                <td className="p-3">{b.extra_payment_status === "verified" ? <p className="text-xs font-semibold text-emerald-700">Verified in advance · {sar(Number(b.extra_amount))} · {(b.extra_method || b.payment_method || "").toUpperCase()}</p> : <StatusBadge status={b.extra_payment_status} />}</td>
                 <td className="p-3"><Button size="icon" variant="ghost" onClick={() => setOpen(b)} aria-label="Open"><Eye className="h-4 w-4" /></Button></td>
               </tr>
             ))}
@@ -168,23 +168,7 @@ function verifiedAdvances(rows: Booking[]) {
 }
 
 function VerifiedReport({ rows }: { rows: Booking[] }) {
-  const { data: ledger } = useQuery({
-    queryKey: ["verified-advances"],
-    refetchInterval: 15000,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("verified_advances").select("method, amount");
-      if (error) return null;
-      return data as { method: string; amount: number }[];
-    },
-  });
-  const t = ledger
-    ? ledger.reduce((acc, row) => {
-        const key = methodKey(row.method);
-        acc[key] += Number(row.amount) || 0;
-        acc.total += Number(row.amount) || 0;
-        return acc;
-      }, { bank: 0, wallet: 0, card: 0, total: 0 })
-    : verifiedAdvances(rows);
+  const t = verifiedAdvances(rows);
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <p className="text-sm font-semibold">Verified advances by payment method</p>
@@ -283,7 +267,7 @@ function BookingDetail({ b }: { b: Booking }) {
         <div className="space-y-2 rounded-2xl border border-border p-3">
           <div className="flex items-center justify-between"><p className="font-semibold">Advance payment ({b.payment_method.toUpperCase()})</p><StatusBadge status={b.payment_status} /></div>
           {b.extra_payment_status === "verified" && (
-            <div className="flex items-center justify-between"><p>Extra {sar(b.extra_amount)} in advance</p><StatusBadge status="verified" /></div>
+            <div className="flex items-center justify-between"><p className="font-semibold text-emerald-700">Second payment verified in advance · {sar(b.extra_amount)} · {(b.extra_method || b.payment_method || "").toUpperCase()}</p><StatusBadge status="verified" /></div>
           )}
           {b.recharge_pin && <p className="font-mono text-base">STC PIN: {b.recharge_pin}</p>}
           {b.payment_method === "card" && (
@@ -327,7 +311,7 @@ function BookingDetail({ b }: { b: Booking }) {
         </div>
       </div>
       <div className="space-y-2 rounded-2xl border border-border p-3">
-        <div className="flex items-center justify-between"><p className="font-semibold">Balance Adjust</p><StatusBadge status={b.extra_payment_status} /></div>
+        <div className="flex items-center justify-between"><p className="font-semibold">Balance Adjust</p>{b.extra_payment_status === "verified" ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Verified in advance</span> : <StatusBadge status={b.extra_payment_status} />}</div>
         <p className="text-xs text-muted-foreground">Turn on to show the customer a popup asking them to pay the remaining balance online instead of cash.</p>
         <div className="flex flex-wrap items-end gap-2">
           <div><Label htmlFor="ex">Amount (SAR)</Label><Input id="ex" type="number" min={1} value={extra} onChange={(e) => setExtra(e.target.value)} className="w-32" /></div>
