@@ -108,7 +108,7 @@ function MyBookings() {
               const payLabel = b.status === "completed" && b.payment_status === "verified" ? "Paid" : b.status === "cancelled" && b.payment_status === "verified" ? "Refunded" : b.payment_status === "verified" ? "Verified" : b.payment_status === "rejected" ? "Rejected" : "Pending";
               const apptTone = b.status === "confirmed" ? "bg-emerald-100 text-emerald-700" : b.status === "completed" ? "bg-sky-100 text-sky-700" : b.status === "cancelled" ? "bg-pink-100 text-[#e23b86]" : "bg-amber-100 text-amber-700";
               const payTone = b.payment_status === "verified" && b.status === "completed" ? "bg-sky-100 text-sky-700" : b.payment_status === "verified" && b.status === "cancelled" ? "bg-pink-100 text-[#e23b86]" : b.payment_status === "verified" ? "bg-emerald-100 text-emerald-700" : b.payment_status === "rejected" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700";
-              const extraPaid = b.extra_payment_status === "verified" && (b.extra_method || b.extra_screenshot_path) ? Number(b.extra_amount) : 0;
+              const extraPaid = b.extra_payment_status === "verified" ? Number(b.extra_amount) : 0;
               const advanceShown = Number(b.advance_amount) + extraPaid;
               const atSalon = Math.max(0, Number(b.total) - advanceShown);
               const wa = (place?.whatsapp || "").replace(/\D/g, "");

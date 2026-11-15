@@ -1122,13 +1122,6 @@ alter table public.bookings add column if not exists payment_code text;
 update public.bookings set payment_code = 'PAY-' || code where payment_code is null;
 
 update public.bookings
-set extra_payment_status = 'awaiting',
-    extra_admin_note = case when extra_admin_note in ('Verified in advance', 'Paid again.') then null else extra_admin_note end
-where extra_payment_status = 'verified'
-  and extra_screenshot_path is null
-  and extra_method is null;
-
-update public.bookings
 set extra_payment_status = 'under_verification',
     extra_admin_note = null
 where extra_payment_status = 'verified'
