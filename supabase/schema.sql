@@ -566,11 +566,11 @@ begin
     if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
     if p_screenshot is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
     update public.bookings set payment_method = 'bank', screenshot_path = p_screenshot, bank_account_id = p.bank_account_id,
-      payment_status = 'verified', status = case when status = 'pending' then 'confirmed' else status end, admin_note = 'Paid again.' where id = p_booking;
+      payment_status = 'pending', admin_note = null where id = p_booking;
   elsif p_method = 'card' then
     if coalesce(s.card_enabled, true) = false or coalesce(p.allow_card, true) = false then raise exception 'CARD_DISABLED'; end if;
     update public.bookings set payment_method = 'card', screenshot_path = null,
-      payment_status = 'verified', status = case when status = 'pending' then 'confirmed' else status end, admin_note = 'Paid again.' where id = p_booking;
+      payment_status = 'pending', admin_note = null where id = p_booking;
   elsif p_method = 'wallet' then
     if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
     if p.wallet_balance < b.advance_amount then raise exception 'LOW_BALANCE'; end if;
@@ -593,15 +593,11 @@ begin
     if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
     if p_screenshot is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
     update public.bookings set extra_method = 'bank', extra_screenshot_path = p_screenshot,
-      extra_payment_status = 'verified', extra_admin_note = 'Paid again.',
-      remaining_amount = greatest(0, coalesce(b.total, 0) - coalesce(b.advance_amount, 0) - coalesce(b.extra_amount, 0))
-      where id = p_booking;
+      extra_payment_status = 'under_verification', extra_admin_note = null where id = p_booking;
   elsif p_method = 'card' then
     if coalesce(s.card_enabled, true) = false or coalesce(p.allow_card, true) = false then raise exception 'CARD_DISABLED'; end if;
     update public.bookings set extra_method = 'card', extra_screenshot_path = null,
-      extra_payment_status = 'verified', extra_admin_note = 'Paid again.',
-      remaining_amount = greatest(0, coalesce(b.total, 0) - coalesce(b.advance_amount, 0) - coalesce(b.extra_amount, 0))
-      where id = p_booking;
+      extra_payment_status = 'under_verification', extra_admin_note = null where id = p_booking;
   elsif p_method = 'wallet' then
     if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
     if p.wallet_balance < b.extra_amount then raise exception 'LOW_BALANCE'; end if;
@@ -1098,10 +1094,12 @@ begin
   if new.status = 'cancelled'
      and old.status is distinct from 'cancelled'
      and coalesce(old.wallet_refunded, false) = false then
-    if new.payment_status = 'verified' then
+    if new.payment_status = 'verified' and coalesce(new.admin_note, '') not in ('Paid again.', 'Verified in advance') then
       refund := refund + coalesce(new.advance_amount, 0);
     end if;
-    if new.extra_payment_status = 'verified' then
+    if new.extra_payment_status = 'verified'
+       and (new.extra_method is not null or new.extra_screenshot_path is not null)
+       and coalesce(new.extra_admin_note, '') not in ('Paid again.', 'Verified in advance') then
       refund := refund + coalesce(new.extra_amount, 0);
     end if;
     if refund > 0 and new.user_id is not null then
@@ -1124,10 +1122,24 @@ alter table public.bookings add column if not exists payment_code text;
 update public.bookings set payment_code = 'PAY-' || code where payment_code is null;
 
 update public.bookings
-set extra_payment_status = 'verified',
-    extra_admin_note = coalesce(nullif(trim(extra_admin_note), ''), 'Verified in advance')
-where coalesce(extra_amount, 0) > 0
-  and extra_payment_status in ('under_verification', 'awaiting');
+set extra_payment_status = 'awaiting',
+    extra_admin_note = case when extra_admin_note in ('Verified in advance', 'Paid again.') then null else extra_admin_note end
+where extra_payment_status = 'verified'
+  and extra_screenshot_path is null
+  and extra_method is null;
+
+update public.bookings
+set extra_payment_status = 'under_verification',
+    extra_admin_note = null
+where extra_payment_status = 'verified'
+  and extra_admin_note in ('Verified in advance', 'Paid again.');
+
+update public.bookings
+set payment_status = 'pending',
+    admin_note = null
+where payment_status = 'verified'
+  and admin_note = 'Paid again.'
+  and payment_method in ('bank', 'card');
 
 create table if not exists public.verified_advances (
   id uuid primary key default gen_random_uuid(),
@@ -1173,9 +1185,16 @@ insert into public.verified_advances (booking_id, method, amount, source)
 select b.id, coalesce(b.extra_method, b.payment_method, 'bank'), coalesce(b.extra_amount, 0), 'extra'
 from public.bookings b
 where b.extra_payment_status = 'verified'
+  and (b.extra_method is not null or b.extra_screenshot_path is not null)
   and not exists (
     select 1 from public.verified_advances v where v.booking_id = b.id and v.source = 'extra'
   );
+
+delete from public.verified_advances v
+using public.bookings b
+where v.booking_id = b.id
+  and v.source = 'extra'
+  and (b.extra_payment_status is distinct from 'verified' or (b.extra_method is null and b.extra_screenshot_path is null));
 
 drop policy if exists "services public read" on public.services;
 create policy "services public read" on public.services for select to anon, authenticated
