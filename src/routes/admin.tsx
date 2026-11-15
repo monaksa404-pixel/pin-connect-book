@@ -6,7 +6,7 @@ import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { sendAlert } from "@/lib/alerts";
-import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, fmtWhen, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
+import { CATEGORIES, DEFAULT_SETTINGS, fmtTime, fmtWhen, KSA_CITIES, mediaUrl, sar, serviceImage, settingsQuery } from "@/lib/data";
 import type { BankAccount, Booking, Profile, SalonLocation, Service, Settings, Topup, WhatsappNumber } from "@/lib/types";
 import { CitySelect, RequireAuth, StatusBadge, EmptyState } from "@/components/shared";
 import { ChatThread } from "@/components/ChatThread";
@@ -133,7 +133,7 @@ function BookingsTab() {
                 <td className="p-3">{b.booking_date}<br /><span className="text-xs text-muted-foreground">{fmtTime(b.booking_time)}</span></td>
                 <td className="p-3 text-xs">{fmtWhen(b.created_at)}</td>
                 <td className="p-3">{sar(b.total)}</td>
-                <td className="p-3"><StatusBadge status={b.payment_status} /><p className="mt-1 text-xs uppercase text-muted-foreground">{b.payment_method}</p>{b.extra_payment_status === "verified" && <p className="mt-1 text-xs font-semibold text-emerald-700">Extra {sar(b.extra_amount)} verified in advance</p>}</td>
+                <td className="p-3"><StatusBadge status={b.payment_status} />{b.payment_status === "verified" && <p className="mt-1 text-xs font-semibold text-emerald-700">Payment verified</p>}<p className="mt-1 text-xs uppercase text-muted-foreground">{b.payment_method}</p>{b.extra_payment_status === "verified" && <p className="mt-1 text-xs font-semibold text-emerald-700">Extra {sar(b.extra_amount)} verified in advance</p>}</td>
                 <td className="p-3"><StatusBadge status={b.status} /></td>
                 <td className="p-3"><StatusBadge status={b.extra_payment_status} /></td>
                 <td className="p-3"><Button size="icon" variant="ghost" onClick={() => setOpen(b)} aria-label="Open"><Eye className="h-4 w-4" /></Button></td>
@@ -144,7 +144,7 @@ function BookingsTab() {
         </table>
       </div>
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" onOpenAutoFocus={(e) => e.preventDefault()}>
           {open && <BookingDetail b={data.find((x) => x.id === open.id) ?? open} />}
         </DialogContent>
       </Dialog>
@@ -168,7 +168,23 @@ function verifiedAdvances(rows: Booking[]) {
 }
 
 function VerifiedReport({ rows }: { rows: Booking[] }) {
-  const t = verifiedAdvances(rows);
+  const { data: ledger } = useQuery({
+    queryKey: ["verified-advances"],
+    refetchInterval: 15000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("verified_advances").select("method, amount");
+      if (error) return null;
+      return data as { method: string; amount: number }[];
+    },
+  });
+  const t = ledger
+    ? ledger.reduce((acc, row) => {
+        const key = methodKey(row.method);
+        acc[key] += Number(row.amount) || 0;
+        acc.total += Number(row.amount) || 0;
+        return acc;
+      }, { bank: 0, wallet: 0, card: 0, total: 0 })
+    : verifiedAdvances(rows);
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <p className="text-sm font-semibold">Verified advances by payment method</p>
@@ -198,6 +214,7 @@ function Shot({ path }: { path: string | null }) {
 function BookingDetail({ b }: { b: Booking }) {
   const qc = useQueryClient();
   const [extra, setExtra] = useState(String(b.extra_amount || b.remaining_amount));
+  const [remainingTouched, setRemainingTouched] = useState(false);
   const [reason, setReason] = useState(b.admin_note ?? "");
   const [form, setForm] = useState({
     phone: b.phone,
@@ -233,21 +250,6 @@ function BookingDetail({ b }: { b: Booking }) {
           <p>Customer Code: {b.user_code || "—"}</p>
         </div>
       </DialogHeader>
-      <div className="space-y-2 rounded-2xl border border-border p-3">
-        <p className="font-semibold">Adjust balance</p>
-        <p className="text-xs text-muted-foreground">Current remaining {sar(Number(b.remaining_amount))}</p>
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <Label htmlFor="bal">New remaining (SAR)</Label>
-            <Input id="bal" type="number" min={0} value={form.remaining_amount} onChange={(e) => setForm({ ...form, remaining_amount: e.target.value })} className="w-40" />
-          </div>
-          <Button size="sm" onClick={() => {
-            const n = Number(form.remaining_amount);
-            if (!Number.isFinite(n) || n < 0) { toast.error("Enter a valid balance"); return; }
-            update({ remaining_amount: n }, "Balance adjusted");
-          }}>Adjust balance</Button>
-        </div>
-      </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div><Label>Name</Label><p className="mt-2 rounded-md border border-input bg-muted px-3 py-2 text-sm">{b.customer_name}</p></div>
         <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
@@ -256,7 +258,7 @@ function BookingDetail({ b }: { b: Booking }) {
         <div><Label>Time</Label><Input type="time" value={form.booking_time} onChange={(e) => setForm({ ...form, booking_time: e.target.value })} /></div>
         <div><Label>Total</Label><Input type="number" value={form.total} onChange={(e) => setForm({ ...form, total: e.target.value })} /></div>
         <div><Label>Advance</Label><Input type="number" value={form.advance_amount} onChange={(e) => setForm({ ...form, advance_amount: e.target.value })} /></div>
-        <div><Label>Remaining</Label><Input type="number" value={form.remaining_amount} onChange={(e) => setForm({ ...form, remaining_amount: e.target.value })} /></div>
+        <div><Label>Remaining</Label><Input type="number" value={form.remaining_amount} onChange={(e) => { setRemainingTouched(true); setForm({ ...form, remaining_amount: e.target.value }); }} /></div>
         <div className="sm:col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
         <Button className="sm:col-span-2" onClick={() => update({
           phone: form.phone,
@@ -265,7 +267,7 @@ function BookingDetail({ b }: { b: Booking }) {
           booking_time: form.booking_time,
           total: Number(form.total),
           advance_amount: Number(form.advance_amount),
-          remaining_amount: Number(form.remaining_amount),
+          ...(remainingTouched ? { remaining_amount: Number(form.remaining_amount) } : {}),
           notes: form.notes || null,
         }, "Booking updated")}>Save changes</Button>
       </div>
@@ -320,7 +322,7 @@ function BookingDetail({ b }: { b: Booking }) {
         <p className="font-semibold">Appointment status</p>
         <div className="flex flex-wrap gap-2">
           {(["pending", "confirmed", "completed", "cancelled"] as const).map((s) => (
-            <Button key={s} size="sm" variant={b.status === s ? "default" : "outline"} className="capitalize" onClick={() => update({ status: s }, `Marked ${s}`)}>{s}</Button>
+            <Button key={s} size="sm" variant={b.status === s ? "default" : "outline"} className="capitalize" onClick={() => update({ status: s }, s === "cancelled" ? "Marked cancelled. Paid amount is added to the customer wallet." : `Marked ${s}`)}>{s}</Button>
           ))}
         </div>
       </div>
@@ -397,18 +399,21 @@ function CustomersTab() {
           <tr><th className="p-3">Customer</th><th className="p-3">Mobile</th><th className="p-3">City</th><th className="p-3">Signed up</th><th className="p-3">Wallet</th><th className="p-3">Location</th><th className="p-3">WhatsApp</th><th /></tr>
         </thead>
         <tbody>
-          {people.map((p) => (
+          {people.map((p) => {
+            const shown = placeShown(p, locations, numbers);
+            return (
             <tr key={p.id} className="border-t border-border">
               <td className="p-3"><p className="font-medium">{p.full_name || "No name"}</p><p className="font-mono text-xs text-muted-foreground">{p.user_code}</p></td>
               <td className="p-3">{p.phone || "—"}</td>
               <td className="p-3">{p.city || "—"}</td>
               <td className="p-3 text-xs">{fmtWhen(p.created_at)}</td>
               <td className="p-3">{sar(Number(p.wallet_balance || 0))}</td>
-              <td className="p-3">{p.assigned_address || "—"}</td>
-              <td className="p-3">{p.assigned_whatsapp || "—"}</td>
+              <td className="p-3">{shown.address || "—"}</td>
+              <td className="p-3">{shown.phone || "—"}</td>
               <td className="p-3"><Button size="icon" variant="ghost" onClick={() => setOpen(p)} aria-label="Open"><Eye className="h-4 w-4" /></Button></td>
             </tr>
-          ))}
+            );
+          })}
           {people.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">No customers</td></tr>}
         </tbody>
       </table>
@@ -445,6 +450,8 @@ function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Pr
         <p className="text-sm">City: {person.city || "—"}</p>
         <p className="text-sm">Signed up: {fmtWhen(person.created_at)}</p>
         <p className="text-sm font-semibold text-[#e23b86]">Wallet balance: {sar(Number(person.wallet_balance || 0))}</p>
+        <p className="text-sm">Location shown to customer: {placeShown(person, locations, numbers).address || "—"}</p>
+        <p className="text-sm">Number shown to customer: {placeShown(person, locations, numbers).phone || "—"}</p>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="flex items-center gap-2">Bank <Switch checked={allowBank} onCheckedChange={setAllowBank} /></label>
@@ -459,14 +466,38 @@ function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Pr
         <Button size="sm" variant="outline" onClick={adjust}>Adjust wallet</Button>
       </div>
       <PlacePick person={person} locations={locations} numbers={numbers} />
+      <CustomerBookings userId={person.id} />
+    </div>
+  );
+}
+
+function CustomerBookings({ userId }: { userId: string }) {
+  const { data = [] } = useQuery({
+    queryKey: ["admin-customer-bookings", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("bookings").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+      if (error) return [] as Booking[];
+      return data as Booking[];
+    },
+  });
+  if (!data.length) return <p className="text-sm text-muted-foreground md:col-span-2">No bookings for this customer.</p>;
+  return (
+    <div className="space-y-4 md:col-span-2">
+      <p className="font-semibold">Bookings</p>
+      {data.map((b) => (
+        <div key={b.id} className="space-y-3 rounded-2xl border border-border p-3">
+          <BookingDetail b={b} />
+        </div>
+      ))}
     </div>
   );
 }
 
 function PlacePick({ person, locations, numbers }: { person: Profile; locations: SalonLocation[]; numbers: WhatsappNumber[] }) {
   const qc = useQueryClient();
-  const [locationId, setLocationId] = useState(person.location_id ?? "");
-  const [whatsappId, setWhatsappId] = useState(person.whatsapp_id ?? "");
+  const shown = placeShown(person, locations, numbers);
+  const [locationId, setLocationId] = useState(person.location_id || shown.loc?.id || "");
+  const [whatsappId, setWhatsappId] = useState(person.whatsapp_id || shown.num?.id || "");
   const save = async () => {
     const { error } = await supabase.rpc("admin_assign_place", { p_user: person.id, p_location: locationId || null, p_whatsapp: whatsappId || null });
     if (error) { toast.error(error.message); return; }
@@ -492,6 +523,24 @@ function PlacePick({ person, locations, numbers }: { person: Profile; locations:
       <Button size="sm" onClick={save}>Save for this customer</Button>
     </div>
   );
+}
+
+function sameCity(a: string | null | undefined, b: string | null | undefined) {
+  const x = (a || "").trim().toLowerCase();
+  const y = (b || "").trim().toLowerCase();
+  return !!x && x === y;
+}
+
+function placeShown(person: Profile, locations: SalonLocation[], numbers: WhatsappNumber[]) {
+  const loc = person.location_id
+    ? locations.find((l) => l.id === person.location_id)
+    : locations.find((l) => l.active && sameCity(l.city, person.city));
+  const num = person.whatsapp_id
+    ? numbers.find((n) => n.id === person.whatsapp_id)
+    : numbers.find((n) => n.active);
+  const address = person.assigned_address || (loc ? [loc.city, loc.address].filter(Boolean).join(", ") : "");
+  const phone = person.assigned_whatsapp || num?.phone || "";
+  return { loc, num, address, phone };
 }
 
 function pinText(url: string | null, address: string | null, city: string) {
@@ -538,6 +587,12 @@ function LocationsTab() {
   return (
     <div className="space-y-3">
       <Button className="rounded-full" onClick={() => { setEdit({ ...blank }); setPin(""); }}><Plus className="mr-1 h-4 w-4" />Add location</Button>
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <p className="text-sm font-semibold">Cities with no location yet</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {KSA_CITIES.filter((city) => !data.some((l) => sameCity(l.city, city))).join(", ") || "Every city already has a location."}
+        </p>
+      </div>
       <div className="overflow-x-auto rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted text-left text-xs text-muted-foreground"><tr><th className="p-3">City</th><th className="p-3">Address</th><th className="p-3">Pin</th><th className="p-3">Status</th><th /></tr></thead>

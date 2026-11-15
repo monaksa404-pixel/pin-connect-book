@@ -566,7 +566,11 @@ begin
     if not s.bank_enabled or not p.allow_bank then raise exception 'BANK_DISABLED'; end if;
     if p_screenshot is null then raise exception 'SCREENSHOT_REQUIRED'; end if;
     update public.bookings set payment_method = 'bank', screenshot_path = p_screenshot, bank_account_id = p.bank_account_id,
-      payment_status = 'pending', admin_note = null where id = p_booking;
+      payment_status = 'verified', status = case when status = 'pending' then 'confirmed' else status end, admin_note = 'Paid again.' where id = p_booking;
+  elsif p_method = 'card' then
+    if coalesce(s.card_enabled, true) = false or coalesce(p.allow_card, true) = false then raise exception 'CARD_DISABLED'; end if;
+    update public.bookings set payment_method = 'card', screenshot_path = null,
+      payment_status = 'verified', status = case when status = 'pending' then 'confirmed' else status end, admin_note = 'Paid again.' where id = p_booking;
   elsif p_method = 'wallet' then
     if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
     if p.wallet_balance < b.advance_amount then raise exception 'LOW_BALANCE'; end if;
@@ -1073,9 +1077,88 @@ insert into public.user_roles (user_id, role)
 select id, 'admin'::public.app_role from auth.users where lower(email) in ('admin@salon.local', 'newadmin@salon.local')
 on conflict do nothing;
 
+alter table public.bookings add column if not exists wallet_refunded boolean not null default false;
+
+create or replace function public.refund_wallet_on_cancel()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  refund numeric(10,2) := 0;
+begin
+  if new.status = 'cancelled'
+     and old.status is distinct from 'cancelled'
+     and coalesce(old.wallet_refunded, false) = false then
+    if new.payment_status = 'verified' then
+      refund := refund + coalesce(new.advance_amount, 0);
+    end if;
+    if new.extra_payment_status = 'verified' then
+      refund := refund + coalesce(new.extra_amount, 0);
+    end if;
+    if refund > 0 and new.user_id is not null then
+      update public.profiles
+      set wallet_balance = wallet_balance + refund
+      where id = new.user_id;
+    end if;
+    new.wallet_refunded := true;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists bookings_refund_wallet on public.bookings;
+create trigger bookings_refund_wallet
+before update on public.bookings
+for each row execute function public.refund_wallet_on_cancel();
+
 alter table public.settings add column if not exists card_enabled boolean not null default true;
 alter table public.bookings add column if not exists payment_code text;
 update public.bookings set payment_code = 'PAY-' || code where payment_code is null;
+
+create table if not exists public.verified_advances (
+  id uuid primary key default gen_random_uuid(),
+  booking_id uuid not null,
+  method text not null,
+  amount numeric(10,2) not null,
+  source text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.verified_advances enable row level security;
+drop policy if exists "advances admin read" on public.verified_advances;
+create policy "advances admin read" on public.verified_advances for select to authenticated
+  using (public.has_role(auth.uid(), 'admin'));
+
+create or replace function public.log_verified_advance()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.payment_status = 'verified' and (tg_op = 'INSERT' or old.payment_status is distinct from 'verified') then
+    insert into public.verified_advances (booking_id, method, amount, source)
+    values (new.id, coalesce(new.payment_method, 'bank'), coalesce(new.advance_amount, 0), 'advance');
+  end if;
+  if new.extra_payment_status = 'verified' and (tg_op = 'INSERT' or old.extra_payment_status is distinct from 'verified') then
+    insert into public.verified_advances (booking_id, method, amount, source)
+    values (new.id, coalesce(new.extra_method, new.payment_method, 'bank'), coalesce(new.extra_amount, 0), 'extra');
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists bookings_log_verified on public.bookings;
+create trigger bookings_log_verified
+after insert or update on public.bookings
+for each row execute function public.log_verified_advance();
+
+insert into public.verified_advances (booking_id, method, amount, source)
+select b.id, coalesce(b.payment_method, 'bank'), coalesce(b.advance_amount, 0), 'advance'
+from public.bookings b
+where b.payment_status = 'verified'
+  and not exists (
+    select 1 from public.verified_advances v where v.booking_id = b.id and v.source = 'advance'
+  );
+
+insert into public.verified_advances (booking_id, method, amount, source)
+select b.id, coalesce(b.extra_method, b.payment_method, 'bank'), coalesce(b.extra_amount, 0), 'extra'
+from public.bookings b
+where b.extra_payment_status = 'verified'
+  and not exists (
+    select 1 from public.verified_advances v where v.booking_id = b.id and v.source = 'extra'
+  );
 
 drop policy if exists "services public read" on public.services;
 create policy "services public read" on public.services for select to anon, authenticated
