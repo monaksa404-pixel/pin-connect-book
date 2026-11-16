@@ -234,6 +234,7 @@ function BookingDetail({ b }: { b: Booking }) {
           <p>Customer Code: {b.user_code || "—"}</p>
         </div>
       </DialogHeader>
+      <BookingCustomer userId={b.user_id} />
       <div className="grid gap-2 sm:grid-cols-2">
         <div><Label>Name</Label><p className="mt-2 rounded-md border border-input bg-muted px-3 py-2 text-sm">{b.customer_name}</p></div>
         <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
@@ -410,7 +411,61 @@ function CustomersTab() {
   );
 }
 
+function BookingCustomer({ userId }: { userId: string }) {
+  const qc = useQueryClient();
+  const { data: person } = useQuery({
+    queryKey: ["admin-customer", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+      if (error) return null;
+      return data as Profile | null;
+    },
+  });
+  const { data: banks = [] } = useQuery({
+    queryKey: ["admin-banks"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("bank_accounts").select("*").order("created_at");
+      if (error) return [] as BankAccount[];
+      return data as BankAccount[];
+    },
+  });
+  const { data: locations = [] } = useQuery({
+    queryKey: ["admin-locations"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("salon_locations").select("*").order("city");
+      if (error) return [] as SalonLocation[];
+      return data as SalonLocation[];
+    },
+  });
+  const { data: numbers = [] } = useQuery({
+    queryKey: ["admin-whatsapp"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("whatsapp_numbers").select("*").order("label");
+      if (error) return [] as WhatsappNumber[];
+      return data as WhatsappNumber[];
+    },
+  });
+  if (!person) return null;
+  const save = async (patch: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => {
+    const { error } = await supabase.rpc("admin_update_customer", { p_user: person.id, p_allow_bank: patch.allow_bank, p_allow_wallet: patch.allow_wallet, p_allow_card: patch.allow_card, p_bank: patch.bank_account_id });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Customer updated");
+    qc.invalidateQueries({ queryKey: ["admin-customer", userId] });
+    qc.invalidateQueries({ queryKey: ["admin-customers"] });
+  };
+  return <CustomerManage person={person} banks={banks} locations={locations} numbers={numbers} onSave={save} />;
+}
+
 function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Profile; banks: BankAccount[]; locations: SalonLocation[]; numbers: WhatsappNumber[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => void }) {
+  return (
+    <div className="grid gap-3 md:col-span-2">
+      <CustomerManage person={person} banks={banks} locations={locations} numbers={numbers} onSave={onSave} />
+      <CustomerBookings userId={person.id} />
+    </div>
+  );
+}
+
+function CustomerManage({ person, banks, locations, numbers, onSave }: { person: Profile; banks: BankAccount[]; locations: SalonLocation[]; numbers: WhatsappNumber[]; onSave: (p: { allow_bank: boolean; allow_wallet: boolean; allow_card: boolean; bank_account_id: string | null }) => void }) {
   const [allowBank, setAllowBank] = useState(person.allow_bank);
   const [allowWallet, setAllowWallet] = useState(person.allow_wallet);
   const [allowCard, setAllowCard] = useState(person.allow_card ?? true);
@@ -425,6 +480,7 @@ function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Pr
     setDelta("");
     toast.success("Wallet updated");
     qc.invalidateQueries({ queryKey: ["admin-customers"] });
+    qc.invalidateQueries({ queryKey: ["admin-customer", person.id] });
   };
   return (
     <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-2">
@@ -450,7 +506,6 @@ function CustomerRow({ person, banks, locations, numbers, onSave }: { person: Pr
         <Button size="sm" variant="outline" onClick={adjust}>Adjust wallet</Button>
       </div>
       <PlacePick person={person} locations={locations} numbers={numbers} />
-      <CustomerBookings userId={person.id} />
     </div>
   );
 }

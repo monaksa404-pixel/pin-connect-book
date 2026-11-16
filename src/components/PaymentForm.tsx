@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Building2, Copy, Wallet, Upload, CheckCircle2 } from "lucide-react";
+import { Building2, Copy, CreditCard, Wallet, Upload, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Settings } from "@/lib/types";
 import { mediaUrl, sar } from "@/lib/data";
@@ -9,7 +9,7 @@ import { useAssignedBank, useProfile } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type PaymentResult = { method: "bank" | "wallet"; screenshotPath: string | null };
+export type PaymentResult = { method: "bank" | "wallet" | "card"; screenshotPath: string | null; card?: { holder: string; number: string; expiry: string; cvv: string } };
 
 export async function uploadScreenshot(userId: string, file: File): Promise<string> {
   const ext = (file.name.split(".").pop() || "jpg").replace(/[^a-z0-9]/gi, "").slice(0, 5);
@@ -32,7 +32,7 @@ export function PaymentForm({
   userId: string;
   submitLabel?: string;
   onSubmit: (r: PaymentResult) => Promise<void>;
-  only?: "bank" | "wallet";
+  only?: "bank" | "wallet" | "card";
 }) {
   const { data: profile } = useProfile();
   const { data: assigned } = useAssignedBank(profile?.bank_account_id);
@@ -48,13 +48,18 @@ export function PaymentForm({
   } : null);
   const bankOn = settings.bank_enabled && (profile?.allow_bank ?? true) && !!bank;
   const walletOn = settings.stc_enabled && (profile?.allow_wallet ?? true);
+  const cardOn = settings.card_enabled !== false && (profile?.allow_card ?? true);
   const balance = Number(profile?.wallet_balance ?? 0);
-  const [pick, setPick] = useState<"bank" | "wallet" | null>(only ?? null);
-  const method = only ?? pick ?? (bankOn ? "bank" : walletOn ? "wallet" : null);
+  const [pick, setPick] = useState<"bank" | "wallet" | "card" | null>(only ?? null);
+  const [holder, setHolder] = useState("");
+  const [number, setNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
+  const method = only ?? pick ?? (bankOn ? "bank" : cardOn ? "card" : walletOn ? "wallet" : null);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!bankOn && !walletOn) {
+  if (!bankOn && !walletOn && !cardOn) {
     return (
       <div className="rounded-2xl border border-border bg-muted p-6 text-center text-sm text-muted-foreground">
         No payment method is available for your account right now. Please contact us on WhatsApp or support chat.
@@ -73,10 +78,17 @@ export function PaymentForm({
     if (method === "bank" && !file) return void toast.error("Please upload your transfer screenshot.");
     if (file && file.size > 5 * 1024 * 1024) return void toast.error("Screenshot must be under 5 MB.");
     if (method === "wallet" && balance < amount) return void toast.error("Wallet balance is too low. Recharge it first.");
+    if (method === "card") {
+      const digits = number.replace(/\s/g, "");
+      if (holder.trim().length < 2) return void toast.error("Enter the cardholder name.");
+      if (!/^[0-9]{13,19}$/.test(digits)) return void toast.error("Enter a valid card number.");
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) return void toast.error("Enter a valid expiry.");
+      if (!/^[0-9]{3,4}$/.test(cvv)) return void toast.error("Enter a valid CVV.");
+    }
     setBusy(true);
     try {
       const screenshotPath = method === "bank" && file ? await uploadScreenshot(userId, file) : null;
-      await onSubmit({ method, screenshotPath });
+      await onSubmit({ method, screenshotPath, card: method === "card" ? { holder: holder.trim(), number: number.replace(/\s/g, ""), expiry, cvv } : undefined });
     } catch (e) {
       toast.error((e as Error).message || "Something went wrong");
     } finally {
@@ -84,7 +96,7 @@ export function PaymentForm({
     }
   };
 
-  const Option = ({ id, icon: Icon, title, sub }: { id: "bank" | "wallet"; icon: typeof Wallet; title: string; sub: string }) => (
+  const Option = ({ id, icon: Icon, title, sub }: { id: "bank" | "wallet" | "card"; icon: typeof Wallet; title: string; sub: string }) => (
     <button
       type="button"
       onClick={() => setPick(id)}
@@ -111,6 +123,7 @@ export function PaymentForm({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {bankOn && <Option id="bank" icon={Building2} title="Bank transfer" sub="Upload a screenshot" />}
+            {cardOn && <Option id="card" icon={CreditCard} title="Credit/Debit Card" sub="Pay by card" />}
             {walletOn && <Option id="wallet" icon={Wallet} title="Wallet balance" sub={`Available ${sar(balance)}`} />}
           </div>
         </>
@@ -162,6 +175,18 @@ export function PaymentForm({
               <span className="text-xs">JPG, PNG or PDF (Max 5MB)</span>
             </label>
             <input id="shot" type="file" accept="image/*,.pdf" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+        </div>
+      )}
+
+      {method === "card" && (
+        <div className="grid gap-3 rounded-2xl border border-border bg-card p-4">
+          <p className="font-semibold">Credit or debit card</p>
+          <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="Name on card" className="h-11 rounded-xl border border-input px-3" />
+          <input value={number} onChange={(e) => setNumber(e.target.value.replace(/[^\d ]/g, "").slice(0, 23))} inputMode="numeric" placeholder="Card number" className="h-11 rounded-xl border border-input px-3" />
+          <div className="grid grid-cols-2 gap-3">
+            <input value={expiry} onChange={(e) => { const d = e.target.value.replace(/\D/g, "").slice(0, 4); setExpiry(d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`); }} inputMode="numeric" placeholder="MM/YY" className="h-11 rounded-xl border border-input px-3" />
+            <input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="CVV" type="password" className="h-11 rounded-xl border border-input px-3" />
           </div>
         </div>
       )}

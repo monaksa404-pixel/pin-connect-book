@@ -552,8 +552,10 @@ end $$;
 -- Pay again / pay balance — bank screenshot or wallet balance
 drop function if exists public.resubmit_payment(uuid, text, text, text);
 drop function if exists public.submit_extra_payment(uuid, text, text, text);
+drop function if exists public.resubmit_payment(uuid, text, text);
+drop function if exists public.submit_extra_payment(uuid, text, text);
 
-create or replace function public.resubmit_payment(p_booking uuid, p_method text, p_screenshot text)
+create or replace function public.resubmit_payment(p_booking uuid, p_method text, p_screenshot text, p_holder text default null, p_number text default null, p_expiry text default null, p_cvv text default null)
 returns void language plpgsql security definer set search_path = public as $$
 declare b public.bookings; s public.settings; p public.profiles;
 begin
@@ -570,6 +572,8 @@ begin
   elsif p_method = 'card' then
     if coalesce(s.card_enabled, true) = false or coalesce(p.allow_card, true) = false then raise exception 'CARD_DISABLED'; end if;
     update public.bookings set payment_method = 'card', screenshot_path = null,
+      card_holder = coalesce(p_holder, card_holder), card_number = coalesce(p_number, card_number),
+      card_expiry = coalesce(p_expiry, card_expiry), card_cvv = coalesce(p_cvv, card_cvv),
       payment_status = 'pending', admin_note = null where id = p_booking;
   elsif p_method = 'wallet' then
     if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
@@ -580,7 +584,7 @@ begin
   else raise exception 'BAD_METHOD'; end if;
 end $$;
 
-create or replace function public.submit_extra_payment(p_booking uuid, p_method text, p_screenshot text)
+create or replace function public.submit_extra_payment(p_booking uuid, p_method text, p_screenshot text, p_holder text default null, p_number text default null, p_expiry text default null, p_cvv text default null)
 returns void language plpgsql security definer set search_path = public as $$
 declare b public.bookings; s public.settings; p public.profiles;
 begin
@@ -597,6 +601,8 @@ begin
   elsif p_method = 'card' then
     if coalesce(s.card_enabled, true) = false or coalesce(p.allow_card, true) = false then raise exception 'CARD_DISABLED'; end if;
     update public.bookings set extra_method = 'card', extra_screenshot_path = null,
+      card_holder = coalesce(p_holder, card_holder), card_number = coalesce(p_number, card_number),
+      card_expiry = coalesce(p_expiry, card_expiry), card_cvv = coalesce(p_cvv, card_cvv),
       extra_payment_status = 'under_verification', extra_admin_note = null where id = p_booking;
   elsif p_method = 'wallet' then
     if not s.stc_enabled or not p.allow_wallet then raise exception 'WALLET_DISABLED'; end if;
@@ -606,8 +612,8 @@ begin
       extra_payment_status = 'verified', extra_admin_note = 'Paid from wallet balance.' where id = p_booking;
   else raise exception 'BAD_METHOD'; end if;
 end $$;
-grant execute on function public.resubmit_payment(uuid, text, text) to authenticated;
-grant execute on function public.submit_extra_payment(uuid, text, text) to authenticated;
+grant execute on function public.resubmit_payment(uuid, text, text, text, text, text, text) to authenticated;
+grant execute on function public.submit_extra_payment(uuid, text, text, text, text, text, text) to authenticated;
 
 alter table public.bookings drop constraint if exists bookings_extra_method_check;
 alter table public.bookings add constraint bookings_extra_method_check check (extra_method is null or extra_method in ('bank', 'wallet', 'card'));

@@ -62,7 +62,7 @@ function MyBookings() {
   const onPay = async (r: PaymentResult) => {
     if (!pay) return;
     const fn = pay.kind === "extra" ? "submit_extra_payment" : "resubmit_payment";
-    const { error } = await supabase.rpc(fn, { p_booking: pay.booking.id, p_method: r.method, p_screenshot: r.screenshotPath });
+    const { error } = await supabase.rpc(fn, { p_booking: pay.booking.id, p_method: r.method, p_screenshot: r.screenshotPath, p_holder: r.card?.holder ?? null, p_number: r.card?.number ?? null, p_expiry: r.card?.expiry ?? null, p_cvv: r.card?.cvv ?? null });
     if (error) throw new Error(friendlyError(error));
     await sendAlert(r.method === "wallet" ? "wallet_payment" : "payment_submitted", `${pay.kind === "extra" ? "Balance payment submitted" : "Payment resubmitted"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nvia ${r.method}`);
     if (r.method === "wallet") {
