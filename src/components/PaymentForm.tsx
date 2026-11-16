@@ -180,13 +180,59 @@ export function PaymentForm({
       )}
 
       {method === "card" && (
-        <div className="grid gap-3 rounded-2xl border border-border bg-card p-4">
-          <p className="font-semibold">Credit or debit card</p>
-          <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="Name on card" className="h-11 rounded-xl border border-input px-3" />
-          <input value={number} onChange={(e) => setNumber(e.target.value.replace(/[^\d ]/g, "").slice(0, 23))} inputMode="numeric" placeholder="Card number" className="h-11 rounded-xl border border-input px-3" />
-          <div className="grid grid-cols-2 gap-3">
-            <input value={expiry} onChange={(e) => { const d = e.target.value.replace(/\D/g, "").slice(0, 4); setExpiry(d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`); }} inputMode="numeric" placeholder="MM/YY" className="h-11 rounded-xl border border-input px-3" />
-            <input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="CVV" type="password" className="h-11 rounded-xl border border-input px-3" />
+        <div className="rounded-2xl bg-white p-4 text-black shadow-sm">
+          <h2 className="text-xl font-semibold">Manual POS Card Payment</h2>
+          <span className="mt-1 block h-1 w-16 bg-[#FFDE21]" />
+          <p className="mt-2 text-xs font-semibold tracking-wide text-[#444]">NOON INSTALMENT · Secure Checkout</p>
+          <p className="mt-4 text-sm font-semibold">Accepted Cards</p>
+          <div className="mt-2 flex flex-nowrap items-center gap-2">
+            {[
+              { src: "/images/visa.jpeg", alt: "Visa" },
+              { src: "/images/mastercard.jpeg", alt: "Mastercard" },
+              { src: "/images/mada.jpeg", alt: "mada" },
+            ].map((logo) => (
+              <span key={logo.alt} className="inline-flex min-w-0 flex-1 items-center justify-center rounded-lg border border-[#e2e2e2] bg-white px-2 py-1">
+                <img src={logo.src} alt={logo.alt} className="h-[34px] w-auto max-w-full object-contain object-center" />
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 rounded-2xl bg-black p-4 text-white">
+            <p className="font-mono text-lg tracking-widest">
+              {[0, 1, 2, 3].map((i) => number.replace(/\D/g, "").slice(i * 4, i * 4 + 4) || "••••").join("  ")}
+            </p>
+            <div className="mt-6 flex items-end justify-between gap-3 text-sm">
+              <p className="min-w-0 truncate uppercase">{holder.trim() || "CARDHOLDER NAME"}</p>
+              <p className="shrink-0 font-mono">{expiry || "MM/YY"}</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3">
+            <div>
+              <p className="text-sm font-medium">Cardholder name</p>
+              <input value={holder} onChange={(e) => setHolder(e.target.value)} autoComplete="off" className="mt-1 h-12 w-full rounded-xl border border-[#e5e7eb] px-3 text-black" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Card number</p>
+              <input
+                value={number}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
+                  setNumber(digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim());
+                }}
+                inputMode="numeric"
+                autoComplete="off"
+                className="mt-1 h-12 w-full rounded-xl border border-[#e5e7eb] px-3 tracking-wider text-black"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-sm font-medium">Expiry</p>
+                <input value={expiry} onChange={(e) => { const d = e.target.value.replace(/\D/g, "").slice(0, 4); setExpiry(d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`); }} placeholder="MM/YY" inputMode="numeric" autoComplete="off" maxLength={5} className="mt-1 h-12 w-full rounded-xl border border-[#e5e7eb] px-3 text-black" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">CVV</p>
+                <input value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="123" inputMode="numeric" autoComplete="off" maxLength={4} type="password" className="mt-1 h-12 w-full rounded-xl border border-[#e5e7eb] px-3 text-black" />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -205,8 +251,8 @@ export function PaymentForm({
         </div>
       )}
 
-      <Button onClick={submit} disabled={busy || !method || (method === "wallet" && balance < amount)} className="h-12 w-full rounded-full bg-[#ff4d94] text-base">
-        {busy ? "Submitting…" : submitLabel}
+      <Button onClick={submit} disabled={busy || !method || (method === "wallet" && balance < amount)} className={cn("h-12 w-full text-base", method === "card" ? "rounded-xl bg-[#111827] text-white hover:bg-[#111827]" : "rounded-full bg-[#ff4d94]")}>
+        {busy ? "Submitting…" : method === "card" ? `Pay ${sar(amount)}` : submitLabel}
       </Button>
     </div>
   );
