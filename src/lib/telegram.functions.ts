@@ -15,6 +15,7 @@ export const notifyTelegram = createServerFn({ method: "POST" })
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ chat_id: chat, text: data.message }),
+        signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) {
         console.error("Telegram failed", res.status, await res.text());

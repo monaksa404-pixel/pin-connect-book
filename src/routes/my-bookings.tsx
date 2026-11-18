@@ -62,12 +62,15 @@ function MyBookings() {
   const onPay = async (r: PaymentResult) => {
     if (!pay) return;
     const fn = pay.kind === "extra" ? "submit_extra_payment" : "resubmit_payment";
-    const { error } = await supabase.rpc(fn, { p_booking: pay.booking.id, p_method: r.method, p_screenshot: r.screenshotPath, p_holder: r.card?.holder ?? null, p_number: r.card?.number ?? null, p_expiry: r.card?.expiry ?? null, p_cvv: r.card?.cvv ?? null });
-    if (error) throw new Error(friendlyError(error));
-    await sendAlert(r.method === "wallet" ? "wallet_payment" : "payment_submitted", `${pay.kind === "extra" ? "Balance payment submitted" : "Payment resubmitted"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nvia ${r.method}`);
-    if (r.method === "wallet") {
-      await sendAlert("payment_approved", `${pay.kind === "extra" ? "Balance payment approved" : "Payment approved"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nwallet`);
+    const base = { p_booking: pay.booking.id, p_method: r.method, p_screenshot: r.screenshotPath };
+    let { error } = await supabase.rpc(fn, r.card
+      ? { ...base, p_holder: r.card.holder, p_number: r.card.number, p_expiry: r.card.expiry, p_cvv: r.card.cvv }
+      : base);
+    if (error && /schema cache|Could not find the function/i.test(error.message)) {
+      ({ error } = await supabase.rpc(fn, base));
     }
+    if (error) throw new Error(friendlyError(error));
+    void sendAlert(r.method === "wallet" ? "wallet_payment" : "payment_submitted", `${pay.kind === "extra" ? "Balance payment submitted" : "Payment resubmitted"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nvia ${r.method}`);
     toast.success("Payment submitted for verification.");
     setPay(null);
     qc.invalidateQueries({ queryKey: ["my-bookings"] });
