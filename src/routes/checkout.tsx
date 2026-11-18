@@ -280,10 +280,6 @@ function Checkout() {
   );
 
   const cardDigits = cardNumber.replace(/\D/g, "");
-  const previewGroups = [0, 1, 2, 3].map((i) => {
-    const part = cardDigits.slice(i * 4, i * 4 + 4);
-    return part || "••••";
-  });
   const brandLogos = [
     { src: "/images/visa.jpeg", alt: "Visa" },
     { src: "/images/mastercard.jpeg", alt: "Mastercard" },
@@ -357,7 +353,7 @@ function Checkout() {
           ))}
         </div>
         <div className="mt-4 rounded-2xl bg-black p-4 text-white">
-          <p className="font-mono text-lg tracking-widest">{previewGroups.join("  ")}</p>
+          <p className="break-all font-mono text-sm tracking-wide">{cardDigits ? (cardDigits.match(/.{1,4}/g) || []).join(" ") : "••••"}</p>
           <div className="mt-6 flex items-end justify-between gap-3 text-sm">
             <p className="min-w-0 truncate uppercase">{cardHolder.trim() || "CARDHOLDER NAME"}</p>
             <p className="shrink-0 font-mono">{cardExpiry || "MM/YY"}</p>

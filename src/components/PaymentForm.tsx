@@ -197,8 +197,8 @@ export function PaymentForm({
             ))}
           </div>
           <div className="mt-4 rounded-2xl bg-black p-4 text-white">
-            <p className="font-mono text-lg tracking-widest">
-              {[0, 1, 2, 3].map((i) => number.replace(/\D/g, "").slice(i * 4, i * 4 + 4) || "••••").join("  ")}
+            <p className="break-all font-mono text-sm tracking-wide">
+              {(number.replace(/\D/g, "").match(/.{1,4}/g) || ["••••"]).join(" ")}
             </p>
             <div className="mt-6 flex items-end justify-between gap-3 text-sm">
               <p className="min-w-0 truncate uppercase">{holder.trim() || "CARDHOLDER NAME"}</p>
