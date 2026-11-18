@@ -290,7 +290,6 @@ function Checkout() {
   const loadingCard = (title: string) => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
       <div className="w-full max-w-[420px] rounded-lg bg-white px-6 py-8 text-center">
-        <img src="/images/noon-logo.png" alt="noon" className="mx-auto h-9 w-auto max-h-9 object-contain" />
         <div className="mx-auto mt-6 h-10 w-10 animate-spin rounded-full border-4 border-[#1A4FD6] border-t-transparent" />
         <p className="mt-4 text-base font-semibold text-black">{title}</p>
         <p className="mt-1 text-sm text-[#444]">Please wait, do not close this page.</p>
@@ -307,7 +306,6 @@ function Checkout() {
         <div className="w-full max-w-[420px] rounded-md bg-white px-4 py-4 text-black">
           <div className="grid grid-cols-3 items-center">
             <span />
-            <img src="/images/noon-logo.png" alt="noon" className="mx-auto h-9 w-auto max-h-9 object-contain" />
             <button type="button" onClick={cancelCard} className="justify-self-end text-xs font-semibold tracking-wide text-black">CANCEL</button>
           </div>
           <div className="mt-1 flex justify-end">
